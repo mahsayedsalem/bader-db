@@ -1,6 +1,6 @@
 [package]
 name = "bader-db"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Mahmoud Salem <mahsayedsalem@gmail.com>"]
 description = "Key-value cache RESP server with support for key expirations"
