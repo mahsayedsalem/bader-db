@@ -2,7 +2,7 @@
 [![Crates.io](https://img.shields.io/crates/v/bader-db.svg)](https://crates.io/crates/bader-io)
 
 <h1 align="center">
-  BADER (بادِر)
+  BADER-DB (بادِر)
 </h1>
 
 <h4 align="center">Key-value cache RESP server with support for key expirations 🏪</h4>
