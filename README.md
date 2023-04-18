@@ -13,7 +13,7 @@
 
 ## Supported Features
 
-* SET — Set with or without an expiry date.
-* GET — Get value by key, we store our values in a BTree.
-* Key Eviction 🏪 — A memory-efficient probabilistic eviction algorithm similar to [Redis](https://redis.io/commands/expire).
+* SET 🏪 — Set with or without an expiry date.
+* GET ⚡ — Get value by key, we store our values in a BTree.
+* Key Eviction ⌛ — A memory-efficient probabilistic eviction algorithm similar to [Redis](https://redis.io/commands/expire).
   
