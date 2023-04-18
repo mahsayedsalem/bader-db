@@ -1,0 +1,24 @@
+[package]
+name = "bader-db"
+version = "0.1.0"
+edition = "2021"
+authors = ["Mahmoud Salem <mahsayedsalem@gmail.com>"]
+description = "Key-value cache RESP server with support for key expirations"
+repository = "https://github.com/mahsayedsalem/bader-db"
+keywords = ["resp", "rust", "async", "caching", "expiration"]
+categories = ["algorithms", "asynchronous", "caching", "data-structures", "parser"]
+readme = "README.md"
+license = "MIT"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.59"
+bytes = "1.3.0"
+thiserror = "1.0.32"
+tokio = { version = "1.23.0", features = ["full"] }
+log = "0.4.17"
+env_logger = "0.9.3"
+rand = "0.8"
+async-timer = "0.7"
+async-std = { version = "1.10", features = ["attributes"] }
