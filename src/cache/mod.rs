@@ -99,7 +99,7 @@ impl Cache {
     }
 
     pub async fn remove_garbage(&self) {
-        println!("monitor started");
+        println!("garbage collection started");
         let frequency = self.frequency;
         let mut interval = Interval::platform_new(frequency);
         loop {
