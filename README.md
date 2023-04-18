@@ -31,7 +31,7 @@ easiest way to use it is to add an entry to your `Cargo.toml` defining the depen
 
 ```toml
 [dependencies]
-bader-db = "0.1"
+bader-db = "0.1.1"
 ```
 
 ### Basic Usage
