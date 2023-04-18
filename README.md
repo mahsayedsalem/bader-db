@@ -5,7 +5,7 @@
   BADER-DB (بادِر)
 </h1>
 
-<h4 align="center">Key-value cache RESP server with support for key expirations 🏪</h4>
+<h4 align="center">Key-value cache RESP server with support for key expirations ⌛</h4>
 
 This is a rust work-in-progress learning project and shouldn't be used in production. 
 
