@@ -2,7 +2,7 @@ pub mod expiry;
 mod entry;
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Mutex;
+use std::sync::RwLock;
 use std::time::{Duration, Instant};
 use anyhow::{Error, Result};
 use std::cmp;
@@ -13,7 +13,7 @@ use async_timer::Interval;
 
 #[derive(Debug)]
 pub struct Cache {
-    store: Mutex<BTreeMap<String, Entry>>,
+    store: RwLock<BTreeMap<String, Entry>>,
     sample: usize,
     threshold: f64,
     frequency: Duration
@@ -22,7 +22,7 @@ pub struct Cache {
 impl Cache {
     pub fn new(sample: usize, threshold: f64, frequency: Duration) -> Self {
         Cache {
-            store: Mutex::new(BTreeMap::new()),
+            store: RwLock::new(BTreeMap::new()),
             sample,
             threshold,
             frequency,
@@ -30,29 +30,29 @@ impl Cache {
     }
 
     pub async fn expired(&self) -> usize {
-        let store = self.store.lock().unwrap();
+        let store = self.store.read().unwrap();
         store.iter().filter(|(_, entry)| entry.expiration().is_expired()).count()
     }
 
     pub async fn clear(&self) {
-        let mut store = self.store.lock().unwrap();
+        let mut store = self.store.write().unwrap();
         store.clear();
     }
 
     pub async fn len(&self) -> usize {
-        let store = self.store.lock().unwrap();
+        let store = self.store.read().unwrap();
         store.len()
     }
 
     pub async fn is_empty(&self) -> bool {
-        let store = self.store.lock().unwrap();
+        let store = self.store.read().unwrap();
         return store.is_empty()
     }
 
     pub async fn set(&self, key: String, value: String) {
         let expiry = Expiry::none();
         let entry = Entry::new(value, expiry);
-        let mut store = self.store.lock().unwrap();
+        let mut store = self.store.write().unwrap();
         store.insert(key, entry);
     }
 
@@ -61,18 +61,19 @@ impl Cache {
             E: Into<Expiry>,
     {
         let entry = Entry::new(value, e.into());
-        let mut store = self.store.lock().unwrap();
+        let mut store = self.store.write().unwrap();
         store.insert(key, entry);
     }
 
     pub async fn get(&self, key: String) -> Option<String> {
-        let mut store = self.store.lock().unwrap();
+        let mut store = self.store.read().unwrap();
         match store.get(key.as_str()) {
             Some(entry) => {
                 if !entry.expiration().is_expired() {
                     Some(entry.value().clone())
                 } else {
-                    store.remove(key.as_str());
+                    drop(store);
+                    self.remove(key);
                     None
                 }
             }
@@ -81,7 +82,7 @@ impl Cache {
     }
 
     pub async fn remove(&self, key: String) -> Result<()> {
-        let mut store = self.store.lock().unwrap();
+        let mut store = self.store.write().unwrap();
         match store.get(key.as_str()) {
             Some(_entry) => {
                 store.remove(key.as_str());
@@ -94,7 +95,7 @@ impl Cache {
     }
 
     pub async fn existing(&self) -> usize {
-        let store = self.store.lock().unwrap();
+        let store = self.store.read().unwrap();
         store.iter().filter(|(_, entry)| !entry.expiration().is_expired()).count()
     }
 
@@ -119,62 +120,60 @@ impl Cache {
         let mut removed = 0;
 
         loop {
-            let mut store = self.store.lock().unwrap();
+            let keys_to_remove: Vec<String> = {
+                let store = self.store.read().unwrap();
 
-            if store.is_empty() {
-                break;
-            }
+                if store.is_empty() {
+                    break;
+                }
 
-            let total = store.len();
-            let sample = cmp::min(sample, total);
+                let total = store.len();
+                let sample = cmp::min(sample, total);
 
-            let mut gone = 0;
+                let mut gone = 0;
 
-            let mut keys = Vec::with_capacity(sample);
-            let mut indices: BTreeSet<usize> = BTreeSet::new();
+                let mut expired_keys = Vec::with_capacity(sample);
+                let mut indices: BTreeSet<usize> = BTreeSet::new();
 
-            {
                 let mut rng = rand::thread_rng();
                 while indices.len() < sample {
                     indices.insert(rng.gen_range(0..total));
                 }
-            }
 
-            {
-                let mut prev = 0;
+                let mut iter = store.iter();
 
-                let mut iter: Box<dyn Iterator<Item = (&String, &Entry)>> =
-                    Box::new(store.iter());
-
-                for idx in indices {
-                    let offset = idx
-                        .checked_sub(prev)
-                        .and_then(|idx| idx.checked_sub(1))
-                        .unwrap_or(0);
-
-                    iter = Box::new(iter.skip(offset));
-                    prev = idx;
-
+                for _ in 0..sample {
                     let (key, entry) = iter.next().unwrap();
 
                     if !entry.expiration().is_expired() {
                         continue;
                     }
 
-                    keys.push(key.to_owned());
+                    expired_keys.push(key.clone());
                     gone += 1;
                 }
+
+                if (gone as f64) < (sample as f64 * threshold) {
+                    break;
+                }
+                expired_keys
+            };
+
+            if keys_to_remove.is_empty() {
+                break;
             }
 
-            for key in &keys {
+            let mut store = self.store.write().unwrap();
+
+            for key in &keys_to_remove {
                 store.remove(key);
             }
 
-            println!("Removed {} / {} ({:.2}%) of the sampled keys", gone, sample, (gone as f64 / sample as f64) * 100f64);
+            println!("Removed {} / {} ({:.2}%) of the sampled keys", keys_to_remove.len(), sample, (keys_to_remove.len() as f64 / sample as f64) * 100f64);
 
-            removed += gone;
+            removed += keys_to_remove.len();
 
-            if (gone as f64) < (sample as f64 * threshold) {
+            if (keys_to_remove.len() as f64) < (sample as f64 * threshold) {
                 break;
             }
         }
@@ -346,15 +345,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_purge_expired_keys() {
-        let cache = Cache::new(10, 0.5, Duration::from_secs(1));
+        let cache = Cache::new(10, 0.5, Duration::from_millis(1));
         cache.set_with_expiry("key1".to_string(), "value1".to_string(), Duration::from_secs(1)).await;
         cache.set_with_expiry("key2".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
         cache.set_with_expiry("key3".to_string(), "value3".to_string(), Duration::from_secs(3)).await;
-        sleep(Duration::from_secs(1));
+        sleep(Duration::from_secs(2));
         cache.purge().await;
-        assert_eq!(cache.len().await, 2);
+        assert_eq!(cache.len().await, 1);
         assert_eq!(cache.get("key1".to_string()).await, None);
-        assert_eq!(cache.get("key2".to_string()).await, Some("value2".to_string()));
+        assert_eq!(cache.get("key2".to_string()).await, None);
         assert_eq!(cache.get("key3".to_string()).await, Some("value3".to_string()));
     }
 
