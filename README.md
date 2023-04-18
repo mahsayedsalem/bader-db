@@ -65,7 +65,7 @@ The eviction algorithm parameters:
 
 Expiration of keys in the cache is performed at intervals, triggered every `frequency` and is done in the background. The approach for performing this task is based on the implementation in Redis, which is straightforward yet effective.
 
-When you call `run_server`, you must provide some arguments some of them are: sample, frequency, and threshold. The following is a summary of the eviction process, explained in a clear way:
+The following is a summary of the eviction process, explained in a clear way:
 
     Wait for the next frequency tick.
     Randomly select a batch of sample entries from the cache.
