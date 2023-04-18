@@ -7,8 +7,14 @@
 
 <h4 align="center">Key-value cache RESP server with support for key expirations 🏪</h4>
 
+This is a rust work-in-progress learning project and shouldn't be used in production. 
+
 <p align="center">
-  <a href="#supported-features">Supported Features</a>
+  <a href="#supported-features">Supported Features</a> •
+  <a href="#getting-started">Getting Started</a> •
+  <a href="#basic-usage">Basic Usage</a> •
+  <a href="#cache-eviction">Cache Eviction</a> •
+  <a href="#testing">Testing</a>
 </p>
 
 ### Supported Features
