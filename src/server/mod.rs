@@ -63,11 +63,14 @@ impl<'a> Server<'a> {
 
         let mut handler = Handler::new(stream);
         loop {
-            let value = handler.read_value().await.unwrap();
-            if let Some(v) = value {
-                let response: Value = Handler::get_response(v, &client_store).await.unwrap();
-                log::info!("response: {:?}", response);
-                handler.write_value(response).await.unwrap();
+            if let Ok(value) = handler.read_value().await{
+                if let Some(v) = value {
+                    let response: Value = Handler::get_response(v, &client_store).await.unwrap();
+                    log::info!("response: {:?}", response);
+                    handler.write_value(response).await.unwrap();
+                } else {
+                    break;
+                }
             } else {
                 break;
             }
