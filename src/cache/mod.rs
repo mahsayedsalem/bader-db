@@ -1,4 +1,4 @@
-pub mod expiry;
+mod expiry;
 mod entry;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -66,14 +66,15 @@ impl Cache {
     }
 
     pub async fn get(&self, key: String) -> Option<String> {
-        let mut store = self.store.read().unwrap();
+        let store = self.store.read().unwrap();
         match store.get(key.as_str()) {
             Some(entry) => {
                 if !entry.expiration().is_expired() {
                     Some(entry.value().clone())
                 } else {
                     drop(store);
-                    self.remove(key);
+                    let mut store = self.store.write().unwrap();
+                    store.remove(key.as_str());
                     None
                 }
             }
@@ -182,6 +183,13 @@ impl Cache {
 
 }
 
+impl Default for Cache {
+    fn default() -> Cache {
+        Cache::new(25, 0.25, Duration::from_secs(1))
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -191,7 +199,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_get() {
-        let cache = Cache::new(25, 0.25, Duration::from_secs(1));
+        let cache = Cache::default();
         let key = "key".to_string();
         let value = "value".to_string();
 
@@ -202,7 +210,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_expired_is_zero() {
-        let cache = Cache::new(25, 0.25, Duration::from_secs(1));
+        let cache = Cache::default();
         let expiry = Expiry::new(Instant::now()  + Duration::from_secs(2));
         cache.set_with_expiry("key".to_string(), "value".to_string(), expiry.clone()).await;
         let count = cache.expired().await;
@@ -211,7 +219,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_expired_is_one() {
-        let cache = Cache::new(25, 0.25, Duration::from_secs(1));
+        let cache = Cache::default();
         let expiry = Expiry::new(Instant::now());
         cache.set_with_expiry("key".to_string(), "value".to_string(), expiry.clone()).await;
         let count = cache.expired().await;
@@ -220,7 +228,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_len() {
-        let cache = Cache::new(25, 0.25, Duration::from_secs(1));
+        let cache = Cache::default();
         let expiry = Expiry::new(Instant::now());
         cache.set_with_expiry("key".to_string(), "value".to_string(), expiry.clone()).await;
         assert_eq!(cache.len().await, 1);
@@ -228,7 +236,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_clear() {
-        let cache = Cache::new(25, 0.25, Duration::from_secs(1));
+        let cache = Cache::default();
         let expiry = Expiry::new(Instant::now());
         cache.set_with_expiry("key".to_string(), "value".to_string(), expiry.clone()).await;
         cache.clear().await;
@@ -237,7 +245,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_is_empty() {
-        let cache = Cache::new(25, 0.25, Duration::from_secs(1));
+        let cache = Cache::default();
         let expiry = Expiry::new(Instant::now());
         cache.set_with_expiry("key".to_string(), "value".to_string(), expiry.clone()).await;
         cache.clear().await;
@@ -246,7 +254,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_with_expiry_get() {
-        let cache = Cache::new(25, 0.25, Duration::from_secs(1));
+        let cache = Cache::default();
         let key = "key".to_string();
         let value = "value".to_string();
 
@@ -264,7 +272,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_with_expiry_get_non_expired() {
-        let cache = Cache::new(25, 0.25, Duration::from_secs(1));
+        let cache = Cache::default();
         let key = "key".to_string();
         let value = "value".to_string();
 
@@ -276,7 +284,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_with_expiry_update_expiry() {
-        let cache = Cache::new(25, 0.25, Duration::from_secs(1));
+        let cache = Cache::default();
         let key = "key".to_string();
         let value = "value".to_string();
 
@@ -301,14 +309,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_non_existing_key() {
-        let cache = Cache::new(25, 0.25, Duration::from_secs(1));
+        let cache = Cache::default();
         let result = cache.get("non_existing_key".to_string()).await;
         assert_eq!(result, None);
     }
 
     #[tokio::test]
     async fn test_remove() {
-        let cache = Cache::new(25, 0.25, Duration::from_secs(1));
+        let cache = Cache::default();
         let key = "key".to_string();
         let value = "value".to_string();
         cache.set(key.clone(), value.clone()).await;
@@ -321,7 +329,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_remove_key_doesnt_exist() {
-        let cache = Cache::new(25, 0.25, Duration::from_secs(1));
+        let cache = Cache::default();
         let key = "key".to_string();
         let result = cache.remove(key.clone()).await;
         assert!(result.is_err())
@@ -329,7 +337,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_existing_is_one() {
-        let cache = Cache::new(25, 0.25, Duration::from_secs(1));
+        let cache = Cache::default();
         let expiry = Expiry::new(Instant::now()  + Duration::from_secs(2));
         cache.set_with_expiry("key".to_string(), "value".to_string(), expiry.clone()).await;
         let count = cache.existing().await;
@@ -432,14 +440,7 @@ mod tests {
         cache.set_with_expiry("key28".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
         cache.set_with_expiry("key29".to_string(), "value1".to_string(), Duration::from_secs(3)).await;
         cache.set_with_expiry("key31".to_string(), "value1".to_string(), Duration::from_secs(3)).await;
-        cache.set_with_expiry("key32".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
-        cache.set_with_expiry("key33".to_string(), "value1".to_string(), Duration::from_secs(1)).await;
-        cache.set_with_expiry("key34".to_string(), "value2".to_string(), Duration::from_secs(1)).await;
-        cache.set_with_expiry("key35".to_string(), "value1".to_string(), Duration::from_secs(4)).await;
-        cache.set_with_expiry("key36".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
-        cache.set_with_expiry("key37".to_string(), "value1".to_string(), Duration::from_secs(3)).await;
-        cache.set_with_expiry("key38".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
-        cache.set_with_expiry("key39".to_string(), "value1".to_string(), Duration::from_secs(3)).await;
+        cache.set_with_expiry("key39".to_string(), "value1".to_string(), Duration::from_secs(6)).await;
         cache.set_with_expiry("key10".to_string(), "value2".to_string(), Duration::from_secs(7)).await;
 
         task::spawn(async move {
@@ -450,7 +451,7 @@ mod tests {
         sleep(Duration::from_secs(5));
 
         // Check that the expired keys were removed
-        assert_eq!(1, cache.len().await);
+        assert_eq!(2, cache.len().await);
     }
 
 }

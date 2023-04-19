@@ -1,10 +1,12 @@
 mod handler;
 
 use std::net::SocketAddr;
-use tokio::net::{TcpListener, TcpStream};
 use std::sync::Arc;
 use std::str;
 use std::time::Duration;
+use bytes::BytesMut;
+use anyhow::Result;
+use tokio::{io::AsyncReadExt, io::AsyncWriteExt, net::TcpStream, net::TcpListener};
 use crate::server::handler::Handler;
 use crate::resp::value::Value;
 use crate::cache::Cache;
@@ -58,16 +60,16 @@ impl<'a> Server<'a> {
         }
     }
 
-    pub async fn handle_connection(stream: TcpStream, addr: SocketAddr, client_store: Arc<Cache>) {
+    pub async fn handle_connection(mut stream: TcpStream, addr: SocketAddr, client_store: Arc<Cache>) {
         log::info!("{:?} {:?}", "Connection established from", addr);
-
-        let mut handler = Handler::new(stream);
         loop {
-            if let Ok(value) = handler.read_value().await{
+            let mut buffer = BytesMut::with_capacity(512);
+            if let Ok(value) = Self::read_value(&mut stream, &mut buffer).await{
                 if let Some(v) = value {
-                    let response: Value = Handler::get_response(v, &client_store).await.unwrap();
+                    let mut handler = Handler::new(v);
+                    let response: Value = handler.process_request(&client_store).await.unwrap();
                     log::info!("response: {:?}", response);
-                    handler.write_value(response).await.unwrap();
+                    Self::write_value(&mut stream, response).await.unwrap();
                 } else {
                     break;
                 }
@@ -75,5 +77,22 @@ impl<'a> Server<'a> {
                 break;
             }
         }
+    }
+
+    pub async fn read_value(stream: &mut TcpStream, buffer: &mut BytesMut) -> Result<Option<Value>> {
+        loop {
+            let bytes_read = stream.read_buf(buffer).await?;
+            // Connection closed
+            if bytes_read == 0 {
+                return Ok(None);
+            }
+            let value = Value::from(&buffer.clone());
+            return Ok(Some(value));
+        }
+    }
+
+    pub async fn write_value(stream: &mut TcpStream, value: Value) -> Result<()> {
+        stream.write(value.encode().as_bytes()).await?;
+        Ok(())
     }
 }
