@@ -181,6 +181,4 @@ mod tests {
         assert_eq!(Command::from("set"), Command::SET);
         assert_eq!(Command::from("unknown"), Command::Uninitialized);
     }
-
-
 }

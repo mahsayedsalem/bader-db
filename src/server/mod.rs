@@ -48,7 +48,7 @@ impl<'a> Server<'a> {
             let client_cache = self.main_cache.clone();
             match incoming {
                 Ok((s, addr)) => {
-                    log::info!("{:?}", "Accepted new connection");
+                    log::debug!("Accepted new connection");
                     tokio::spawn(async move {
                         Self::handle_connection(s, addr, client_cache).await;
                     });
@@ -61,20 +61,28 @@ impl<'a> Server<'a> {
     }
 
     pub async fn handle_connection(mut stream: TcpStream, addr: SocketAddr, client_store: Arc<Cache>) {
-        log::info!("{:?} {:?}", "Connection established from", addr);
+
+        log::info!("Received connection from {:?}", addr);
+
         loop {
             let mut buffer = BytesMut::with_capacity(512);
-            if let Ok(value) = Self::read_value(&mut stream, &mut buffer).await{
-                if let Some(v) = value {
-                    let mut handler = Handler::new(v);
-                    let response: Value = handler.process_request(&client_store).await.unwrap();
-                    log::info!("response: {:?}", response);
-                    Self::write_value(&mut stream, response).await.unwrap();
-                } else {
+
+            match Self::read_value(&mut stream, &mut buffer).await {
+                Ok(value) => {
+                    if let Some(v) = value {
+                        let mut handler = Handler::new(v);
+                        let response: Value = handler.process_request(&client_store).await.unwrap();
+
+                        log::debug!("response: {:?}", response);
+                        Self::write_value(&mut stream, response).await.unwrap();
+                    } else {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    log::error!("error: {:?}", e);
                     break;
                 }
-            } else {
-                break;
             }
         }
     }

@@ -52,6 +52,9 @@ impl Cache {
     pub async fn set(&self, key: String, value: String) {
         let expiry = Expiry::none();
         let entry = Entry::new(value, expiry);
+
+        log::debug!("inserting key {} and value {:?}", key.clone(), entry);
+
         let mut store = self.store.write().unwrap();
         store.insert(key, entry);
     }
@@ -61,6 +64,9 @@ impl Cache {
             E: Into<Expiry>,
     {
         let entry = Entry::new(value, e.into());
+
+        log::debug!("inserting key {} and value {:?}", key.clone(), entry);
+
         let mut store = self.store.write().unwrap();
         store.insert(key, entry);
     }
@@ -69,6 +75,9 @@ impl Cache {
         let store = self.store.read().unwrap();
         match store.get(key.as_str()) {
             Some(entry) => {
+
+                log::debug!("getting key {} and value {:?}", key.clone(), entry);
+
                 if !entry.expiration().is_expired() {
                     Some(entry.value().clone())
                 } else {
@@ -85,7 +94,8 @@ impl Cache {
     pub async fn remove(&self, key: String) -> Result<()> {
         let mut store = self.store.write().unwrap();
         match store.get(key.as_str()) {
-            Some(_entry) => {
+            Some(entry) => {
+                log::debug!("removing key {} and value {:?}", key.clone(), entry);
                 store.remove(key.as_str());
                 Ok(())
             }
@@ -101,7 +111,9 @@ impl Cache {
     }
 
     pub async fn remove_garbage(&self) {
-        println!("garbage collection started");
+
+        log::debug!("removing garbage in the background");
+
         let frequency = self.frequency;
         let mut interval = Interval::platform_new(frequency);
         loop {
@@ -111,74 +123,102 @@ impl Cache {
     }
 
     pub async fn purge(&self) {
+        let start = Instant::now();
+        log::debug!("purging is starting in {:?}", start);
 
         let sample = self.sample;
         let threshold = self.threshold;
 
-        let start = Instant::now();
-
-        let locked = Duration::from_nanos(0);
+        let mut locked = Duration::from_nanos(0);
         let mut removed = 0;
 
         loop {
-            let keys_to_remove: Vec<String> = {
-                let store = self.store.read().unwrap();
 
-                if store.is_empty() {
-                    break;
-                }
+            let store = self.store.read().unwrap();
 
-                let total = store.len();
-                let sample = cmp::min(sample, total);
+            if store.is_empty() {
+                break;
+            }
 
-                let mut gone = 0;
+            let total = store.len();
+            let sample = cmp::min(sample, total);
 
-                let mut expired_keys = Vec::with_capacity(sample);
-                let mut indices: BTreeSet<usize> = BTreeSet::new();
+            let mut gone = 0;
 
+            let mut expired_keys = Vec::with_capacity(sample);
+            let mut indices: BTreeSet<usize> = BTreeSet::new();
+
+            {
+                // fetch `sample` keys at random
                 let mut rng = rand::thread_rng();
                 while indices.len() < sample {
                     indices.insert(rng.gen_range(0..total));
                 }
+            }
 
-                let mut iter = store.iter();
+            {
+                // tracker for previous index
+                let mut prev = 0;
 
-                for _ in 0..sample {
+                // boxed iterator to allow us to iterate a single time for all indices
+                let mut iter: Box<dyn Iterator<Item = (&String, &Entry)>> =
+                    Box::new(store.iter());
+
+                // walk our index list
+                for idx in indices {
+                    // calculate how much we need to shift the iterator
+                    let offset = idx
+                        .checked_sub(prev)
+                        .and_then(|idx| idx.checked_sub(1))
+                        .unwrap_or(0);
+
+                    // shift and mark the current index
+                    iter = Box::new(iter.skip(offset));
+                    prev = idx;
+
+                    // fetch the next pair (at our index)
                     let (key, entry) = iter.next().unwrap();
 
+                    // skip if not expired
                     if !entry.expiration().is_expired() {
                         continue;
                     }
 
-                    expired_keys.push(key.clone());
+                    // otherwise mark for removal
+                    expired_keys.push(key.to_owned());
+
+                    // and increment remove count
                     gone += 1;
                 }
+            }
 
-                if (gone as f64) < (sample as f64 * threshold) {
-                    break;
+            {
+                // drop the read lock
+                drop(store);
+
+                // upgrade to a write guard so that we can make our changes
+                let acquired = Instant::now();
+
+                let mut store = self.store.write().unwrap();
+
+                // remove all expired keys
+                for key in &expired_keys {
+                    store.remove(key);
                 }
-                expired_keys
-            };
 
-            if keys_to_remove.is_empty() {
-                break;
+                // increment the lock timer tracking directly
+                locked = locked.checked_add(acquired.elapsed()).unwrap();
             }
 
-            let mut store = self.store.write().unwrap();
+            log::debug!("Removed {} / {} ({:.2}%) of the sampled keys", gone, sample, (gone as f64 / sample as f64) * 100f64);
 
-            for key in &keys_to_remove {
-                store.remove(key);
-            }
+            removed += gone;
 
-            println!("Removed {} / {} ({:.2}%) of the sampled keys", keys_to_remove.len(), sample, (keys_to_remove.len() as f64 / sample as f64) * 100f64);
-
-            removed += keys_to_remove.len();
-
-            if (keys_to_remove.len() as f64) < (sample as f64 * threshold) {
+            if (gone as f64) < (sample as f64 * threshold) {
                 break;
             }
         }
-        println!("Purge loop removed {} entries in {:.0?} ({:.0?} locked)", removed, start.elapsed(), locked);
+        log::debug!("Purge loop removed {} entries in {:.0?} ({:.0?} locked)", removed, start.elapsed(), locked);
     }
 
 }
