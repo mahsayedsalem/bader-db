@@ -21,7 +21,7 @@ This is a rust work-in-progress learning project and shouldn't be used in produc
 * SET 🏪 — Set with or without an expiry date.
 * GET ⚡ — Get value by key, we store our values in a BTree.
 * Key Eviction ⌛ — A memory-efficient probabilistic eviction algorithm similar to [Redis](https://redis.io/commands/expire).
-* Memory Safe 🏎️ — Ensures the latest value is always retrieved, handles race conditions.
+* Memory Safe 🛡️ — Ensures the latest value is always retrieved, handles race conditions.
 
 ## Getting Started
 
