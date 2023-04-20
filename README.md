@@ -20,7 +20,7 @@ This is a rust work-in-progress learning project and shouldn't be used in produc
 * SET, GET and DELETE VALUE ⚡ — Set with or without an expiry date.
 * Expiry Format 🕰️ — Set your expiry in seconds (EX) or milliseconds (PX).
 * EXISTS 🏪 — Returns "true" if key exists or "false" otherwise.
-* Key Eviction ⌛ — A memory-efficient probabilistic eviction algorithm similar to [Redis](https://redis.io/commands/expire).
+* Passive and Active Key Eviction ⌛ — A memory-efficient probabilistic eviction algorithm similar to [Redis](https://redis.io/commands/expire).
 * Memory Safe 🛡️ — Ensures the latest value is always retrieved, handles race conditions.
 
 ## Supported Commands
