@@ -53,10 +53,45 @@ impl From<u64> for Expiry {
     }
 }
 
+// Automatic conversation from `u64`.
+impl From<(u64, &String)> for Expiry {
+    fn from(expiry: (u64, &String)) -> Self {
+        let amount = expiry.0;
+        let format = expiry.1;
+        let expiry_type = format.to_ascii_lowercase().as_str().into();
+        match expiry_type {
+            ExpiryFormat::PX => {
+                Duration::from_millis(amount).into()
+            } ,
+            ExpiryFormat::EX => {
+                Duration::from_secs(amount).into()
+            },
+            _ => Self{ instant: None},
+        }
+    }
+}
+
 // Automatic conversation from `Duration`.
 impl From<Duration> for Expiry {
     fn from(duration: Duration) -> Self {
         Instant::now().checked_add(duration).unwrap().into()
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ExpiryFormat {
+    EX,
+    PX,
+    Uninitialized,
+}
+
+impl From<&str> for ExpiryFormat {
+    fn from(s: &str) -> Self {
+        match s {
+            "ex" => ExpiryFormat::EX,
+            "px" => ExpiryFormat::PX,
+            _ => ExpiryFormat::Uninitialized,
+        }
     }
 }
 

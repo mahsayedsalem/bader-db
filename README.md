@@ -19,6 +19,7 @@ This is a rust work-in-progress learning project and shouldn't be used in produc
 ## Supported Features
 
 * SET 🏪 — Set with or without an expiry date.
+* Expiry Format 🕰️ — Set your expiry in seconds (EX) or milliseconds (PX).
 * GET ⚡ — Get value by key, we store our values in a BTree to ensure fast retrieval.
 * Key Eviction ⌛ — A memory-efficient probabilistic eviction algorithm similar to [Redis](https://redis.io/commands/expire).
 * Memory Safe 🛡️ — Ensures the latest value is always retrieved, handles race conditions.
@@ -73,7 +74,38 @@ The following is a summary of the eviction process, explained in a clear way:
 This allows the user to control the aggressiveness of eviction by adjusting the values of threshold and frequency. It's important to keep in mind that the higher the threshold value, the more memory the cache will use on average.
 
 ## Testing 
-using `redis-cli` you can run this simple script to set some values with different expirations and watch the logs as the eviction algorithm takes place.
+
+You can use `redis-cli` to test the server. Simple install `redis-cli` and you can set a key using:
+
+```sh
+$ redis-cli set hello world
+```
+
+then you can get it using
+
+```sh
+$ redis-cli get hello
+```
+
+This should output `world`
+
+You can also set with expiry in 
+* Seconds using the EX flag
+* Milliseconds using the PX flag
+
+```sh
+$ redis-cli set hello world ex 100
+```
+
+This would make the value world live for 100 seconds being removed. 
+
+```sh
+$ redis-cli set hello world px 100
+```
+
+This would make the value world live for 100 milliseconds being removed.
+
+You can also run this simple script to set some values with different expirations and watch the logs as the eviction algorithm takes place.
 
 ```rust
 use std::process::Command;
@@ -91,7 +123,7 @@ fn main() {
             .arg("set")
             .arg(i.to_string())
             .arg(i.to_string())
-            .arg("EXP")
+            .arg("PX")
             .arg(expiry.to_string())
             .spawn()
             .expect("ls command failed to start");
@@ -105,7 +137,7 @@ fn main() {
             .arg("set")
             .arg(i.to_string())
             .arg(i.to_string())
-            .arg("EXP")
+            .arg("PX")
             .arg(expiry.to_string())
             .spawn()
             .expect("ls command failed to start");

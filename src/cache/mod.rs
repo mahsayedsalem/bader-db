@@ -1,4 +1,4 @@
-mod expiry;
+pub mod expiry;
 mod entry;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -397,6 +397,20 @@ mod tests {
         cache.set_with_expiry("key1".to_string(), "value1".to_string(), Duration::from_secs(1)).await;
         cache.set_with_expiry("key2".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
         cache.set_with_expiry("key3".to_string(), "value3".to_string(), Duration::from_secs(3)).await;
+        sleep(Duration::from_secs(2));
+        cache.purge().await;
+        assert_eq!(cache.len().await, 1);
+        assert_eq!(cache.get("key1".to_string()).await, None);
+        assert_eq!(cache.get("key2".to_string()).await, None);
+        assert_eq!(cache.get("key3".to_string()).await, Some("value3".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_expiry_formats() {
+        let cache = Cache::new(10, 0.5, Duration::from_millis(1));
+        cache.set_with_expiry("key1".to_string(), "value1".to_string(), (10u64, &"PX".to_string())).await;
+        cache.set_with_expiry("key2".to_string(), "value2".to_string(), (1u64, &"EX".to_string())).await;
+        cache.set_with_expiry("key3".to_string(), "value3".to_string(), (3u64, &"EX".to_string())).await;
         sleep(Duration::from_secs(2));
         cache.purge().await;
         assert_eq!(cache.len().await, 1);

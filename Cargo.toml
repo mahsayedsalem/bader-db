@@ -22,3 +22,4 @@ env_logger = "0.9.3"
 rand = "0.8"
 async-timer = "0.7"
 async-std = { version = "1.10", features = ["attributes"] }
+chrono = "0.4.24"
