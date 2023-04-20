@@ -1,4 +1,4 @@
-![Unit Tests](https://github.com/mahsayedsalem/bader-db/actions/workflows/quickstart.yml/badge.svg)
+![Unit Tests](https://github.com/mahsayedsalem/bader-db/actions/workflows/test.yml/badge.svg)
 [![Crates.io](https://img.shields.io/crates/v/bader-db.svg)](https://crates.io/crates/bader-db)
 <h1 align="center">
   BADER-DB (بادِر)
