@@ -29,26 +29,6 @@ impl Cache {
         }
     }
 
-    pub async fn expired(&self) -> usize {
-        let store = self.store.read().unwrap();
-        store.iter().filter(|(_, entry)| entry.expiration().is_expired()).count()
-    }
-
-    pub async fn clear(&self) {
-        let mut store = self.store.write().unwrap();
-        store.clear();
-    }
-
-    pub async fn len(&self) -> usize {
-        let store = self.store.read().unwrap();
-        store.len()
-    }
-
-    pub async fn is_empty(&self) -> bool {
-        let store = self.store.read().unwrap();
-        return store.is_empty()
-    }
-
     pub async fn set(&self, key: String, value: String) {
         let expiry = Expiry::none();
         let entry = Entry::new(value, expiry);
@@ -105,12 +85,12 @@ impl Cache {
         }
     }
 
-    pub async fn existing(&self) -> usize {
-        let store = self.store.read().unwrap();
-        store.iter().filter(|(_, entry)| !entry.expiration().is_expired()).count()
+    pub async fn exists(&self, key: String) -> bool {
+        let mut store = self.store.write().unwrap();
+        store.contains_key(key.as_str())
     }
 
-    pub async fn remove_garbage(&self) {
+    pub async fn monitor_for_expiry(&self) {
 
         log::debug!("removing garbage in the background");
 
@@ -219,6 +199,31 @@ impl Cache {
             }
         }
         log::debug!("Purge loop removed {} entries in {:.0?} ({:.0?} locked)", removed, start.elapsed(), locked);
+    }
+
+    pub async fn len(&self) -> usize {
+        let store = self.store.read().unwrap();
+        store.len()
+    }
+
+    pub async fn is_empty(&self) -> bool {
+        let store = self.store.read().unwrap();
+        return store.is_empty()
+    }
+
+    pub async fn existing(&self) -> usize {
+        let store = self.store.read().unwrap();
+        store.iter().filter(|(_, entry)| !entry.expiration().is_expired()).count()
+    }
+
+    pub async fn expired(&self) -> usize {
+        let store = self.store.read().unwrap();
+        store.iter().filter(|(_, entry)| entry.expiration().is_expired()).count()
+    }
+
+    pub async fn clear(&self) {
+        let mut store = self.store.write().unwrap();
+        store.clear();
     }
 
 }
@@ -498,7 +503,7 @@ mod tests {
         cache.set_with_expiry("key10".to_string(), "value2".to_string(), Duration::from_secs(7)).await;
 
         task::spawn(async move {
-            clone.remove_garbage().await;
+            clone.monitor_for_expiry().await;
         });
 
         // Sleep for 5 seconds to allow the monitoring task to run

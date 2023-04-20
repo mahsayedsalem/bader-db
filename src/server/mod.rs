@@ -40,7 +40,7 @@ impl<'a> Server<'a> {
         let clone = self.main_cache.clone();
 
         tokio::spawn(async move {
-            clone.remove_garbage().await
+            clone.monitor_for_expiry().await
         });
 
         loop {
@@ -71,7 +71,7 @@ impl<'a> Server<'a> {
                 Ok(value) => {
                     if let Some(v) = value {
                         let mut handler = Handler::new(v);
-                        let response: Value = handler.process_request(&client_store).await.unwrap();
+                        let response: Value = handler.handle_request(&client_store).await.unwrap();
 
                         log::debug!("response: {:?}", response);
                         Self::write_value(&mut stream, response).await.unwrap();
