@@ -15,13 +15,20 @@
 
 This is a rust work-in-progress learning project and shouldn't be used in production.
 
-## Supported Features
+## Supported Feature
 
-* SET 🏪 — Set with or without an expiry date.
+* SET, GET and DELETE VALUE ⚡ — Set with or without an expiry date.
 * Expiry Format 🕰️ — Set your expiry in seconds (EX) or milliseconds (PX).
-* GET ⚡ — Get value by key, we store our values in a BTree to ensure fast retrieval.
+* EXISTS 🏪 — Returns "true" if key exists or "false" otherwise.
 * Key Eviction ⌛ — A memory-efficient probabilistic eviction algorithm similar to [Redis](https://redis.io/commands/expire).
 * Memory Safe 🛡️ — Ensures the latest value is always retrieved, handles race conditions.
+
+## Supported Commands
+
+* SET
+* GET
+* DEL
+* EXISTS
 
 ## Getting Started
 
