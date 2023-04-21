@@ -108,7 +108,7 @@ impl Cache {
 
         let sample = self.sample;
         let threshold = self.threshold;
-
+        let mut total = 0usize;
         let mut locked = Duration::from_nanos(0);
         let mut removed = 0;
 
@@ -120,7 +120,7 @@ impl Cache {
                 break;
             }
 
-            let total = store.len();
+            total = store.len();
             let sample = cmp::min(sample, total);
 
             let mut gone = 0;
@@ -198,7 +198,7 @@ impl Cache {
                 break;
             }
         }
-        log::debug!("Purge loop removed {} entries in {:.0?} ({:.0?} locked)", removed, start.elapsed(), locked);
+        log::debug!("Purge loop removed {} entries out of {} in {:.0?} ({:.0?} locked)", removed, total, start.elapsed(), locked);
     }
 
     pub async fn len(&self) -> usize {
