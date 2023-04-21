@@ -81,6 +81,11 @@ This allows the user to control the aggressiveness of eviction by adjusting the 
 
 ## Testing 
 
+There's a testing script to run the server, start the server in debug mode by running
+```sh
+$ RUST_LOG=debug cargo run --bin server_main 
+```
+
 You can use `redis-cli` to test the server. Simple install `redis-cli` and you can set a key using:
 
 ```sh
@@ -120,22 +125,7 @@ use std::{thread, time};
 fn main() {
     println!("Started filling");
 
-    for i in 10..2000 {
-        let expiry = 10 * i;
-        let sleep_time = time::Duration::from_nanos(100);
-        thread::sleep(sleep_time);
-        let i = format!("nx{}", i.to_string());
-        Command::new("redis-cli")
-            .arg("set")
-            .arg(i.to_string())
-            .arg(i.to_string())
-            .arg("PX")
-            .arg(expiry.to_string())
-            .spawn()
-            .expect("ls command failed to start");
-    }
-
-    for i in 10..5000 {
+    for i in 10..7000 {
         let expiry = 10 * i;
         let sleep_time = time::Duration::from_nanos(100);
         thread::sleep(sleep_time);
