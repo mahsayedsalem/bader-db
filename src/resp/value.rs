@@ -45,8 +45,8 @@ impl Value {
     }
 }
 
-impl From<&BytesMut> for Value {
-    fn from(buffer: &BytesMut) -> Self {
+impl From<&mut BytesMut> for Value {
+    fn from(buffer: &mut BytesMut) -> Self {
         match  Parser::parse_message(buffer){
             Ok((v, _)) => v,
             _ => Self::Error("error in parsing".to_string())
@@ -140,7 +140,7 @@ mod tests {
     fn test_from_bytes() {
         let mut bytes = BytesMut::new();
         bytes.put_slice(b"*2\r\n$5\r\nhello\r\n$5\r\nworld\r\n");
-        let v = Value::from(&bytes);
+        let v = Value::from(&mut bytes);
         assert_eq!(v, Value::Array(vec![Value::BulkString("hello".to_string()),
                                         Value::BulkString("world".to_string())]))
     }
