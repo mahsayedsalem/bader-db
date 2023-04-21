@@ -17,7 +17,7 @@ This is a rust work-in-progress learning project and shouldn't be used in produc
 
 ## Supported Feature
 
-* SET, GET and DELETE VALUE ⚡ — Set with or without an expiry date.
+* SET, GET and DELETE values ⚡ — Set with or without an expiry date.
 * Expiry Format 🕰️ — Set your expiry in seconds (EX) or milliseconds (PX).
 * EXISTS 🏪 — Returns "true" if key exists or "false" otherwise.
 * Passive and Active Key Eviction ⌛ — A memory-efficient probabilistic eviction algorithm similar to [Redis](https://redis.io/commands/expire).
@@ -37,7 +37,7 @@ easiest way to use it is to add an entry to your `Cargo.toml` defining the depen
 
 ```toml
 [dependencies]
-bader-db = "0.1.4"
+bader-db = "0.1.5"
 ```
 
 ## Basic Usage

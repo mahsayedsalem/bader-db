@@ -62,7 +62,6 @@ pub async fn run_server(socket_addr: &str,
         ..
     } = server;
 
-
     // closing background monitor
     task.abort();
 
