@@ -4,11 +4,10 @@ mod resp;
 
 use std::time::Duration;
 use std::sync::Arc;
-use tokio::{io::AsyncReadExt, io::AsyncWriteExt, net::TcpStream, net::TcpListener, sync::broadcast, sync::mpsc, signal};
+use tokio::{net::TcpListener, sync::broadcast, signal};
 
 use crate::server::Server;
 use crate::cache::Cache;
-use crate::server::shutdown::Shutdown;
 
 pub async fn run_server(socket_addr: &str,
                         sample: usize,
@@ -23,7 +22,6 @@ pub async fn run_server(socket_addr: &str,
 
     // Channels used for a graceful shutdown
     let (notify_shutdown, _) = broadcast::channel(1);
-    let (shutdown_complete_tx, mut shutdown_complete_rx) = mpsc::channel(1);
 
     // Create the main_cache arc that we clone in every connection. We only clone a ref to the store
     // which makes it inexpensive
@@ -41,11 +39,10 @@ pub async fn run_server(socket_addr: &str,
     });
 
     // Create the server instance
-    let mut server = Server::new(socket_addr,
+    let server = Server::new(socket_addr,
                                  main_cache,
                                  listener,
-                                 notify_shutdown,
-                                 shutdown_complete_tx);
+                                 notify_shutdown);
 
     log::info!("{:?}", "Server is created");
 
@@ -61,7 +58,6 @@ pub async fn run_server(socket_addr: &str,
     }
 
     let Server {
-        shutdown_complete_tx,
         notify_shutdown,
         ..
     } = server;
@@ -72,7 +68,6 @@ pub async fn run_server(socket_addr: &str,
 
     // gracefully exit from all spinning connections
     drop(notify_shutdown);
-    drop(shutdown_complete_tx);
 
     log::info!("{:?}", "Server is closed");
 }

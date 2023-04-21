@@ -10,7 +10,6 @@ use rand::prelude::*;
 use async_timer::Interval;
 use crate::cache::entry::Entry;
 use crate::cache::expiry::Expiry;
-use crate::server::shutdown::Shutdown;
 
 #[derive(Debug)]
 pub struct Cache {
@@ -87,7 +86,7 @@ impl Cache {
     }
 
     pub async fn exists(&self, key: String) -> bool {
-        let mut store = self.store.write().unwrap();
+        let store = self.store.write().unwrap();
         store.contains_key(key.as_str())
     }
 
