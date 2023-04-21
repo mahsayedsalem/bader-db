@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use crate::resp::value::Value;
@@ -17,7 +17,9 @@ pub struct Handler {
 
 impl Handler {
     pub fn new(client_store: Arc<Cache>,
-               connection: Option<Connection>, shutdown: Option<Shutdown>, _shutdown_complete: Option<mpsc::Sender<()>>) -> Self {
+               connection: Option<Connection>,
+               shutdown: Option<Shutdown>,
+               _shutdown_complete: Option<mpsc::Sender<()>>) -> Self {
         return Self {
             client_store,
             connection,
@@ -31,23 +33,45 @@ impl Handler {
         log::info!("Received connection");
 
         while self.shutdown.is_none() || !self.shutdown.as_ref().unwrap().is_shutdown()  {
-            if let Ok(value) = self.connection.as_mut().unwrap().read_value().await {
-                if let Some(v) = value {
-                    match self.handle_request(v).await {
-                        Ok(response) => {
-                            self.connection.as_mut().unwrap().write_value(response).await;
-                        }
-                        Err(e) => {
-                            log::error!("error: {:?}", e);
+
+            let maybe_request = match self.shutdown.as_mut() {
+                Some(shutdown) => {
+                    let maybe_request = tokio::select! {
+                        res = self.connection.as_mut().unwrap().read_value() => {
+                            res
+                        },
+                        _ = shutdown.recv() => {
                             break;
                         }
+                    };
+                    maybe_request
+                }
+                None => {
+                    self.connection.as_mut().unwrap().read_value().await
+                }
+            };
+
+            match maybe_request {
+                Ok(value) => {
+                    if let Some(v) = value {
+                        match self.handle_request(v).await {
+                            Ok(response) => {
+                                self.connection.as_mut().unwrap().write_value(response).await;
+                            }
+                            Err(e) => {
+                                log::error!("error: {:?}", e);
+                                break;
+                            }
+                        }
+                    } else {
+                        log::error!("response is None");
+                        break;
                     }
-                } else {
+                }
+                Err(e) => {
+                    log::error!("error: {:?}", e);
                     break;
                 }
-            } else {
-                log::error!("error:");
-                break;
             }
         }
     }
