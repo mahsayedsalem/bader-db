@@ -59,9 +59,6 @@ impl Handler {
                                 break;
                             }
                         }
-                    } else {
-                        log::error!("response is None");
-                        break;
                     }
                 }
                 Err(e) => {
