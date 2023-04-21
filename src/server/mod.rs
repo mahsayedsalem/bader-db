@@ -1,5 +1,6 @@
 mod handler;
 mod connection;
+pub mod shutdown;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -28,6 +29,8 @@ impl<'a> Server<'a> {
                 sample,
                 threshold,
                 frequency,
+                None,
+                None
             ))
         }
     }
@@ -51,7 +54,7 @@ impl<'a> Server<'a> {
                 Ok((s, addr)) => {
                     let client_cache = self.main_cache.clone();
                     let mut handler = Handler::new(client_cache,
-                                                   Some(Connection::new(s)));
+                                                   Some(Connection::new(s)), None, None);
                     tokio::spawn(async move {
                         handler.handle_connection().await;
                     });

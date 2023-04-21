@@ -1,22 +1,28 @@
 use anyhow::Result;
 use std::sync::Arc;
+use tokio::sync::mpsc;
 use crate::resp::value::Value;
 use crate::cache::expiry::ExpiryFormat;
 use crate::cache::Cache;
 use crate::server::connection::Connection;
+use crate::server::shutdown::Shutdown;
 
 #[derive(Debug)]
 pub struct Handler {
     client_store: Arc<Cache>,
-    connection: Option<Connection>
+    connection: Option<Connection>,
+    shutdown: Option<Shutdown>,
+    _shutdown_complete: Option<mpsc::Sender<()>>,
 }
 
 impl Handler {
     pub fn new(client_store: Arc<Cache>,
-               connection: Option<Connection>,) -> Self {
+               connection: Option<Connection>, shutdown: Option<Shutdown>, _shutdown_complete: Option<mpsc::Sender<()>>) -> Self {
         return Self {
             client_store,
-            connection
+            connection,
+            shutdown,
+            _shutdown_complete
         };
     }
 
@@ -24,7 +30,7 @@ impl Handler {
 
         log::info!("Received connection");
 
-        loop  {
+        while self.shutdown.is_none() || !self.shutdown.as_ref().unwrap().is_shutdown()  {
             if let Ok(value) = self.connection.as_mut().unwrap().read_value().await {
                 if let Some(v) = value {
                     match self.handle_request(v).await {
@@ -180,7 +186,7 @@ mod tests {
     async fn test_ping_command() -> Result<()> {
         let cache = Arc::new(Cache::default());
         let value = Value::Array(vec![Value::BulkString("PING".to_string())]);
-        let mut handler = Handler::new(cache, None);
+        let mut handler = Handler::new(cache, None, None, None);
         let response = handler.handle_request(value.clone()).await?;
         assert_eq!(response, Value::SimpleString("PONG".to_string()));
         Ok(())
@@ -193,7 +199,7 @@ mod tests {
             Value::BulkString("hello".to_string())
         ]);
         let cache = Arc::new(Cache::default());
-        let mut handler = Handler::new(cache, None);
+        let mut handler = Handler::new(cache, None, None, None);
         let response = handler.handle_request(value.clone()).await?;
         assert_eq!(response, Value::BulkString("hello".to_string()));
         Ok(())
@@ -206,7 +212,7 @@ mod tests {
             Value::BulkString("GET".to_string()),
             Value::BulkString("key".to_string())
         ]);
-        let mut handler = Handler::new(cache.clone(), None);
+        let mut handler = Handler::new(cache.clone(), None, None, None);
         let response = handler.handle_request(value.clone()).await?;
         assert_eq!(response, Value::Null);
 
@@ -226,7 +232,7 @@ mod tests {
         ]);
 
         let cache = Arc::new(Cache::default());
-        let mut handler = Handler::new(cache.clone(), None);
+        let mut handler = Handler::new(cache.clone(), None, None, None);
 
         let response = handler.handle_request(value.clone()).await?;
         assert_eq!(response, Value::SimpleString("OK".to_string()));
@@ -244,7 +250,7 @@ mod tests {
             Value::BulkString("100".to_string())
         ]);
         let cache = Arc::new(Cache::default());
-        let mut handler = Handler::new(cache.clone(), None);
+        let mut handler = Handler::new(cache.clone(), None, None, None);
         let response = handler.handle_request(value.clone()).await?;
         assert_eq!(response, Value::SimpleString("OK".to_string()));
         assert_eq!(cache.get("key".to_string()).await, Some("value".to_string()));
@@ -262,7 +268,7 @@ mod tests {
             Value::BulkString("0".to_string())
         ]);
         let cache = Arc::new(Cache::default());
-        let mut handler = Handler::new(cache.clone(), None);
+        let mut handler = Handler::new(cache.clone(), None, None, None);
         let response = handler.handle_request(value.clone()).await?;
         assert_eq!(response, Value::SimpleString("OK".to_string()));
         assert_eq!(cache.get("key".to_string()).await, None);
@@ -278,7 +284,7 @@ mod tests {
             Value::BulkString("get".to_string()),
             Value::BulkString("key".to_string())
         ]);
-        let mut handler = Handler::new(cache, None);
+        let mut handler = Handler::new(cache, None, None, None);
 
         let response = handler.handle_request(value.clone()).await?;
         assert_eq!(response, Value::SimpleString("value".to_string()));
@@ -313,7 +319,7 @@ mod tests {
             Value::BulkString("key".to_string())
         ]);
 
-        let mut handler = Handler::new(cache, None);
+        let mut handler = Handler::new(cache, None, None, None);
 
         let response = handler.handle_request(value.clone()).await?;
         assert_eq!(response, Value::SimpleString("true".to_string()));

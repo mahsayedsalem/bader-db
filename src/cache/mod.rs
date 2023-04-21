@@ -6,26 +6,32 @@ use std::sync::RwLock;
 use std::time::{Duration, Instant};
 use anyhow::{Error, Result};
 use std::cmp;
-use crate::cache::entry::Entry;
-use crate::cache::expiry::Expiry;
 use rand::prelude::*;
 use async_timer::Interval;
+use tokio::sync::mpsc;
+use crate::cache::entry::Entry;
+use crate::cache::expiry::Expiry;
+use crate::server::shutdown::Shutdown;
 
 #[derive(Debug)]
 pub struct Cache {
     store: RwLock<BTreeMap<String, Entry>>,
     sample: usize,
     threshold: f64,
-    frequency: Duration
+    frequency: Duration,
+    shutdown: Option<Shutdown>,
+    _shutdown_complete: Option<mpsc::Sender<()>>,
 }
 
 impl Cache {
-    pub fn new(sample: usize, threshold: f64, frequency: Duration) -> Self {
+    pub fn new(sample: usize, threshold: f64, frequency: Duration, shutdown: Option<Shutdown>, _shutdown_complete: Option<mpsc::Sender<()>>) -> Self {
         Cache {
             store: RwLock::new(BTreeMap::new()),
             sample,
             threshold,
             frequency,
+            shutdown,
+            _shutdown_complete
         }
     }
 
@@ -96,7 +102,7 @@ impl Cache {
 
         let frequency = self.frequency;
         let mut interval = Interval::platform_new(frequency);
-        loop {
+        while self.shutdown.is_none() || !self.shutdown.as_ref().unwrap().is_shutdown()  {
             interval.as_mut().await;
             self.purge().await;
         }
@@ -230,7 +236,7 @@ impl Cache {
 
 impl Default for Cache {
     fn default() -> Cache {
-        Cache::new(25, 0.25, Duration::from_secs(1))
+        Cache::new(25, 0.25, Duration::from_secs(1), None, None)
     }
 }
 
@@ -391,14 +397,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_purge_empty_cache() {
-        let cache = Cache::new(10, 0.5, Duration::from_secs(1));
+        let cache = Cache::new(10, 0.5, Duration::from_secs(1), None, None);
         cache.purge().await;
         assert_eq!(cache.len().await, 0);
     }
 
     #[tokio::test]
     async fn test_purge_expired_keys() {
-        let cache = Cache::new(10, 0.5, Duration::from_millis(1));
+        let cache = Cache::new(10, 0.5, Duration::from_millis(1), None, None);
         cache.set_with_expiry("key1".to_string(), "value1".to_string(), Duration::from_secs(1)).await;
         cache.set_with_expiry("key2".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
         cache.set_with_expiry("key3".to_string(), "value3".to_string(), Duration::from_secs(3)).await;
@@ -412,7 +418,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_expiry_formats() {
-        let cache = Cache::new(10, 0.5, Duration::from_millis(1));
+        let cache = Cache::new(10, 0.5, Duration::from_millis(1), None, None);
         cache.set_with_expiry("key1".to_string(), "value1".to_string(), (10u64, &"PX".to_string())).await;
         cache.set_with_expiry("key2".to_string(), "value2".to_string(), (1u64, &"EX".to_string())).await;
         cache.set_with_expiry("key3".to_string(), "value3".to_string(), (3u64, &"EX".to_string())).await;
@@ -426,7 +432,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_purge_all_expired_entries() {
-        let cache = Cache::new(2, 0.5, Duration::from_secs(1));
+        let cache = Cache::new(2, 0.5, Duration::from_secs(1), None, None);
         let key1 = "key1".to_string();
         let key2 = "key2".to_string();
 
@@ -444,7 +450,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_purge_some_expired_entries() {
-        let cache = Cache::new(3, 0.5, Duration::from_secs(1));
+        let cache = Cache::new(3, 0.5, Duration::from_secs(1), None, None);
         let key1 = "key1".to_string();
         let key2 = "key2".to_string();
         let key3 = "key3".to_string();
@@ -468,7 +474,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_monitor() {
-        let cache = Arc::new(Cache::new(10, 0.5, Duration::from_millis(100)));
+        let cache = Arc::new(Cache::new(10, 0.5, Duration::from_millis(100), None, None));
         let clone = cache.clone();
         // Insert some values with an expiry time of 3 seconds
         cache.set_with_expiry("key1".to_string(), "value1".to_string(), Duration::from_secs(3)).await;
