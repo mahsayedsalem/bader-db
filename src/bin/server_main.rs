@@ -9,6 +9,6 @@ pub async fn main() -> Result<()> {
     let sample = 10;
     let threshold = 0.5;
     let frequency = Duration::from_millis(100);
-    run_server(format!("127.0.0.1:{}", port).as_str(), sample, threshold, frequency).await;
+    run_server(format!("0.0.0.0:{}", port).as_str(), sample, threshold, frequency).await;
     Ok(())
 }

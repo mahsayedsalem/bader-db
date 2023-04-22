@@ -1,0 +1,6 @@
+version: '3'
+services:
+  bader_db:
+    build: .
+    ports:
+      - 6377-6379:6379
