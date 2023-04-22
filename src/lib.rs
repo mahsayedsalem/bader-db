@@ -20,9 +20,6 @@ pub async fn run_server(socket_addr: &str,
     // Create the shutdown signal which will shutdown when we hit ctrl_c
     let shutdown = signal::ctrl_c();
 
-    // Channels used for a graceful shutdown
-    let (notify_shutdown, _) = broadcast::channel(1);
-
     // Create the main_cache arc that we clone in every connection. We only clone a ref to the store
     // which makes it inexpensive
     let main_cache = Arc::new(Cache::new(
@@ -41,8 +38,7 @@ pub async fn run_server(socket_addr: &str,
     // Create the server instance
     let server = Server::new(socket_addr,
                                  main_cache,
-                                 listener,
-                                 notify_shutdown);
+                                 listener);
 
     log::info!("{:?}", "Server is created");
 
@@ -57,16 +53,9 @@ pub async fn run_server(socket_addr: &str,
         }
     }
 
-    let Server {
-        notify_shutdown,
-        ..
-    } = server;
-
     // closing background monitor
     task.abort();
 
-    // gracefully exit from all spinning connections
-    drop(notify_shutdown);
 
     log::info!("{:?}", "Server is closed");
 }

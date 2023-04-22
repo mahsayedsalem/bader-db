@@ -15,20 +15,17 @@ pub struct Server<'a> {
     socket_addr: &'a str,
     main_cache: Arc<Cache>,
     listener: TcpListener,
-    pub notify_shutdown: broadcast::Sender<()>,
 }
 
 impl<'a> Server<'a> {
     pub fn new(socket_addr: &'a str,
                main_cache: Arc<Cache>,
-               listener: TcpListener,
-               notify_shutdown: broadcast::Sender<()>) -> Self {
+               listener: TcpListener) -> Self {
 
         Server {
             socket_addr,
             main_cache,
             listener,
-            notify_shutdown,
         }
 
     }
@@ -45,8 +42,7 @@ impl<'a> Server<'a> {
                 Ok((s, _)) => {
                     let client_cache = self.main_cache.clone();
                     let mut handler = Handler::new(client_cache,
-                                                   Some(Connection::new(s)),
-                                                   Some(Shutdown::new(self.notify_shutdown.subscribe())));
+                                                   Some(Connection::new(s)));
                     tokio::spawn(async move {
                         handler.handle_connection().await;
                     });
