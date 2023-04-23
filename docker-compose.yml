@@ -1,6 +1,10 @@
+# run using `docker-compose up --scale bader-db=3`
+
 version: '3'
 services:
-  bader_db:
+  bader-db:
+    environment:
+      - RUST_LOG=info
     build: .
     ports:
       - 6377-6379:6379

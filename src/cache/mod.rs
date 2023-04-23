@@ -16,7 +16,8 @@ pub struct Cache {
     store: RwLock<BTreeMap<String, Entry>>,
     sample: usize,
     threshold: f64,
-    frequency: Duration
+    frequency: Duration,
+    is_leader: bool
 }
 
 impl Cache {
@@ -26,12 +27,17 @@ impl Cache {
             sample,
             threshold,
             frequency,
+            is_leader: false,
         }
     }
 
     pub async fn set(&self, key: String, value: String) {
         let expiry = Expiry::none();
         let entry = Entry::new(value, expiry);
+
+        if self.is_leader {
+            todo!()
+        }
 
         log::debug!("inserting key {} and value {:?}", key.clone(), entry);
 
@@ -44,6 +50,10 @@ impl Cache {
             E: Into<Expiry>,
     {
         let entry = Entry::new(value, e.into());
+
+        if self.is_leader {
+            todo!()
+        }
 
         log::debug!("inserting key {} and value {:?}", key.clone(), entry);
 
@@ -75,12 +85,17 @@ impl Cache {
         let mut store = self.store.write().unwrap();
         match store.get(key.as_str()) {
             Some(entry) => {
+
+                if self.is_leader {
+                    todo!()
+                }
+
                 log::debug!("removing key {} and value {:?}", key.clone(), entry);
                 store.remove(key.as_str());
                 Ok(())
             }
             _ => {
-                Err(Error::msg(format!("Error in removing entry with key {:?}", key)))
+                Err(Error::msg(format!("key {:?} doesn't exist", key)))
             },
         }
     }
