@@ -1,6 +1,6 @@
 use crate::resp::parser::Parser;
 use anyhow::{Error, Result};
-use bytes::BytesMut;
+use bytes::{BytesMut, BufMut};
 
 
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -40,6 +40,13 @@ impl Value {
             Value::Integer(s) => format!(":{}\r\n", s.as_str()),
             Value::Error(msg) => format!("-{}\r\n", msg.as_str()),
             Value::BulkString(s) => format!("${}\r\n{}\r\n", s.chars().count(), s),
+            Value::Array(s) => {
+                let mut r = String::new();
+                for v in s.iter() {
+                    r.push_str(v.clone().encode().as_str());
+                }
+                r
+            }
             _ => panic!("value encode not implemented for: {:?}", self),
         }
     }
@@ -51,6 +58,14 @@ impl From<&mut BytesMut> for Value {
             Ok((v, _)) => v,
             _ => Self::Error("error in parsing".to_string())
         }
+    }
+}
+
+impl Default for Value {
+    fn default() -> Self {
+        let mut bytes = BytesMut::new();
+        bytes.put_slice(b"*2\r\n$5\r\nhello\r\n$5\r\nworld\r\n");
+        Value::from(&mut bytes)
     }
 }
 
@@ -126,14 +141,13 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_encode_array_value_cause_panic() {
         let v = vec![
-            Value::BulkString("set".to_string()),
-            Value::BulkString("country egypt".to_string()),
+            Value::BulkString("get".to_string()),
+            Value::BulkString("country".to_string()),
         ];
         let v = Value::Array(v);
-        v.encode();
+        assert_eq!("$3\r\nget\r\n$7\r\ncountry\r\n".to_string(), v.encode());
     }
 
     #[test]

@@ -55,8 +55,8 @@ impl Handler {
             Command::PING => Value::SimpleString("PONG".to_string()),
             Command::ECHO=> args.first().unwrap().clone(),
             Command::Get => self.handle_get(&args).await,
-            Command::SET => self.handle_set(&args).await,
-            Command::DELETE => self.handle_delete(&args).await,
+            Command::SET => self.handle_set(&args, &value).await,
+            Command::DELETE => self.handle_delete(&args, &value).await,
             Command::EXISTS => self.handle_exists(&args).await,
             _ => Value::Error(format!("command not implemented: {}", first_arg)),
         };
@@ -75,7 +75,7 @@ impl Handler {
         }
     }
 
-    async fn handle_set(&mut self, args: &Vec<Value>) -> Value {
+    async fn handle_set(&mut self, args: &Vec<Value>, message: &Value) -> Value {
         if let (Some(Value::BulkString(key)), Some(Value::BulkString(value))) =
             (args.get(0), args.get(1))
         {
@@ -84,12 +84,12 @@ impl Handler {
             {
                 let e = ExpiryFormat::from(expiry_format.as_str());
                 if e != ExpiryFormat::Uninitialized {
-                    self.handle_set_with_expiry(key, value, amount, Some(expiry_format)).await
+                    self.handle_set_with_expiry(key, value, amount, Some(expiry_format), message).await
                 } else {
-                    self.handle_set_with_expiry(key, value, amount, None).await
+                    self.handle_set_with_expiry(key, value, amount, None, message).await
                 }
             } else {
-                self.client_store.set(key.clone(), value.clone()).await;
+                self.client_store.set(key.clone(), value.clone(), message).await;
                 Value::SimpleString("OK".to_string())
             }
         } else {
@@ -97,7 +97,7 @@ impl Handler {
         }
     }
 
-    async fn handle_set_with_expiry(&self, key: &String, value: &String, amount: &String, expiry_format: Option<&String>) -> Value {
+    async fn handle_set_with_expiry(&self, key: &String, value: &String, amount: &String, expiry_format: Option<&String>, message: &Value) -> Value {
         if let Ok(amount) = amount.parse::<u64>() {
 
             match expiry_format {
@@ -106,6 +106,7 @@ impl Handler {
                     key.clone(),
                     value.clone(),
                     (amount, e),
+                    message
                 ).await;
                 }
                 _ => {
@@ -113,6 +114,7 @@ impl Handler {
                         key.clone(),
                         value.clone(),
                         amount,
+                        message,
                     ).await;
                 }
             }
@@ -122,9 +124,9 @@ impl Handler {
         }
     }
 
-    async fn handle_delete(&self, args: &Vec<Value>) -> Value {
+    async fn handle_delete(&self, args: &Vec<Value>, message: &Value) -> Value {
         if let Some(Value::BulkString(key)) = args.get(0) {
-            match self.client_store.remove(key.clone()).await {
+            match self.client_store.remove(key.clone(), message).await {
                 Ok(_) => Value::SimpleString("OK".to_string()),
                 Err(e) => Value::Error(format!("Error while deleting: {:?}", e))
             }
@@ -207,11 +209,14 @@ mod tests {
             Value::BulkString("GET".to_string()),
             Value::BulkString("key".to_string())
         ]);
+
+        let message = Value::default();
+
         let mut handler = Handler::new(cache.clone(), None);
         let response = handler.handle_request(value.clone()).await?;
         assert_eq!(response, Value::Null);
 
-        cache.set("key".to_string(), "value".to_string()).await;
+        cache.set("key".to_string(), "value".to_string(), &message).await;
         let response = handler.handle_request(value.clone()).await?;
         assert_eq!(response, Value::SimpleString("value".to_string()));
 
@@ -274,7 +279,9 @@ mod tests {
     #[tokio::test]
     async fn test_del_command() -> Result<()> {
         let cache = Arc::new(Cache::default());
-        cache.set("key".to_string(), "value".to_string()).await;
+        let message = Value::default();
+
+        cache.set("key".to_string(), "value".to_string(), &message).await;
         let value = Value::Array(vec![
             Value::BulkString("get".to_string()),
             Value::BulkString("key".to_string())
@@ -307,7 +314,9 @@ mod tests {
     #[tokio::test]
     async fn test_exists_command() -> Result<()> {
         let cache = Arc::new(Cache::default());
-        cache.set("key".to_string(), "value".to_string()).await;
+        let message = Value::default();
+
+        cache.set("key".to_string(), "value".to_string(), &message).await;
 
         let value = Value::Array(vec![
             Value::BulkString("exists".to_string()),

@@ -5,6 +5,7 @@ services:
   bader-db:
     environment:
       - RUST_LOG=info
+      - IS_LEADER=1
     build: .
     ports:
       - 6377-6379:6379

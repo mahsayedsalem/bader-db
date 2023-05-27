@@ -1,6 +1,7 @@
 mod server;
 mod cache;
 mod resp;
+mod client;
 
 use std::time::Duration;
 use std::sync::Arc;
@@ -12,7 +13,15 @@ use crate::cache::Cache;
 pub async fn run_server(socket_addr: &str,
                         sample: usize,
                         threshold: f64,
-                        frequency: Duration) {
+                        frequency: Duration,
+                        is_leader: &String) {
+
+    // set is_leader bool
+
+    let is_leader = match is_leader.as_str() {
+        "1" => true,
+        _ => false,
+    };
 
     // Bind a tcp listener
     let listener = TcpListener::bind(socket_addr).await.unwrap();
@@ -26,6 +35,7 @@ pub async fn run_server(socket_addr: &str,
         sample,
         threshold,
         frequency,
+        is_leader
     ));
 
     // Create a a cache clone to spawn the cache monitor_for_expiry
@@ -55,7 +65,6 @@ pub async fn run_server(socket_addr: &str,
 
     // closing background monitor
     task.abort();
-
 
     log::info!("{:?}", "Server is closed");
 }
