@@ -2,8 +2,8 @@ use crate::resp::value::Value;
 use anyhow::{Error, Result};
 use bytes::BytesMut;
 
-const CARRIAGE_RETURN: u8 = '\r' as u8;
-const NEWLINE: u8 = '\n' as u8;
+const CARRIAGE_RETURN: u8 = b'\r';
+const NEWLINE: u8 = b'\n';
 
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct Parser;
