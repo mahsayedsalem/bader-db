@@ -3,11 +3,11 @@ mod handler;
 pub mod shutdown;
 
 use crate::cache::Cache;
-use crate::server::{connection::Connection, handler::Handler, shutdown::Shutdown};
+use crate::server::{connection::Connection, handler::Handler};
 use anyhow::Result;
 use std::str;
 use std::sync::Arc;
-use tokio::{net::TcpListener, sync::broadcast};
+use tokio::net::TcpListener;
 
 #[derive(Debug)]
 pub struct Server<'a> {

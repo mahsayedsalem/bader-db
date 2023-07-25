@@ -4,7 +4,7 @@ mod server;
 
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::{net::TcpListener, signal, sync::broadcast};
+use tokio::{net::TcpListener, signal};
 
 use crate::cache::Cache;
 use crate::server::Server;

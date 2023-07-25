@@ -2,7 +2,6 @@ use crate::cache::expiry::ExpiryFormat;
 use crate::cache::Cache;
 use crate::resp::value::Value;
 use crate::server::connection::Connection;
-use crate::server::shutdown::Shutdown;
 use anyhow::Result;
 use std::sync::Arc;
 
