@@ -20,17 +20,15 @@ impl Connection {
     }
 
     pub async fn read_value(&mut self) -> Result<Option<Value>> {
-        loop {
-            let bytes_read = self.stream.read_buf(&mut self.buffer).await?;
+        let bytes_read = self.stream.read_buf(&mut self.buffer).await?;
 
-            // Connection closed
-            if bytes_read == 0 {
-                return Ok(None);
-            }
-
-            let value = Value::from(&mut self.buffer.clone());
-            return Ok(Some(value));
+        // Connection closed
+        if bytes_read == 0 {
+            return Ok(None);
         }
+
+        let value = Value::from(&mut self.buffer.clone());
+        return Ok(Some(value));
     }
 
     pub async fn write_value(&mut self, value: Value) {
