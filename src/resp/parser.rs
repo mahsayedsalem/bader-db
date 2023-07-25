@@ -1,7 +1,6 @@
 use crate::resp::value::Value;
-use bytes::BytesMut;
 use anyhow::{Error, Result};
-
+use bytes::BytesMut;
 
 const CARRIAGE_RETURN: u8 = '\r' as u8;
 const NEWLINE: u8 = '\n' as u8;
@@ -61,12 +60,13 @@ impl Parser {
     }
 
     fn decode_bulk_string(buffer: &BytesMut) -> Result<(Value, usize)> {
-        let (bulk_length, bytes_consumed) = if let Some((line, len)) = Parser::read_until_crlf(&buffer[1..]) {
-            let bulk_length = Parser::parse_integer(line)?;
-            (bulk_length, len + 1)
-        } else {
-            return Err(Error::msg("Error in decoding simple array"));
-        };
+        let (bulk_length, bytes_consumed) =
+            if let Some((line, len)) = Parser::read_until_crlf(&buffer[1..]) {
+                let bulk_length = Parser::parse_integer(line)?;
+                (bulk_length, len + 1)
+            } else {
+                return Err(Error::msg("Error in decoding simple array"));
+            };
         let end_of_bulk = bytes_consumed + (bulk_length as usize);
         let end_of_bulk_line = end_of_bulk + 2;
         return if end_of_bulk_line <= buffer.len() {
@@ -98,12 +98,11 @@ impl Parser {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::resp::parser::Parser;
     use crate::resp::value::Value;
-    use bytes::{BytesMut, BufMut};
+    use bytes::{BufMut, BytesMut};
 
     #[test]
     fn test_parse_simple_string() {
@@ -138,8 +137,13 @@ mod tests {
         bytes.put_slice(b"*2\r\n$5\r\nhello\r\n$5\r\nworld\r\n");
         let (v, s) = Parser::parse_message(&bytes).unwrap();
         assert_eq!(s, 26);
-        assert_eq!(v, Value::Array(vec![Value::BulkString("hello".to_string()),
-                                        Value::BulkString("world".to_string())]));
+        assert_eq!(
+            v,
+            Value::Array(vec![
+                Value::BulkString("hello".to_string()),
+                Value::BulkString("world".to_string())
+            ])
+        );
     }
 
     #[test]

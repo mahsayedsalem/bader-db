@@ -1,10 +1,10 @@
-use anyhow::{Result};
-use std::sync::Arc;
-use crate::resp::value::Value;
 use crate::cache::expiry::ExpiryFormat;
 use crate::cache::Cache;
+use crate::resp::value::Value;
 use crate::server::connection::Connection;
 use crate::server::shutdown::Shutdown;
+use anyhow::Result;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct Handler {
@@ -13,8 +13,7 @@ pub struct Handler {
 }
 
 impl Handler {
-    pub fn new(client_store: Arc<Cache>,
-               connection: Option<Connection>) -> Self {
+    pub fn new(client_store: Arc<Cache>, connection: Option<Connection>) -> Self {
         return Self {
             client_store,
             connection,
@@ -22,13 +21,17 @@ impl Handler {
     }
 
     pub async fn handle_connection(&mut self) {
-        loop  {
+        loop {
             match self.connection.as_mut().unwrap().read_value().await {
                 Ok(value) => {
                     if let Some(v) = value {
                         match self.handle_request(v).await {
                             Ok(response) => {
-                                self.connection.as_mut().unwrap().write_value(response).await;
+                                self.connection
+                                    .as_mut()
+                                    .unwrap()
+                                    .write_value(response)
+                                    .await;
                             }
                             Err(e) => {
                                 log::error!("error: {:?}", e);
@@ -47,13 +50,12 @@ impl Handler {
         }
     }
 
-
     pub async fn handle_request(&mut self, value: Value) -> Result<Value> {
         let (first_arg, args) = value.to_command()?;
         let command = first_arg.to_ascii_lowercase().as_str().into();
         let response = match command {
             Command::PING => Value::SimpleString("PONG".to_string()),
-            Command::ECHO=> args.first().unwrap().clone(),
+            Command::ECHO => args.first().unwrap().clone(),
             Command::Get => self.handle_get(&args).await,
             Command::SET => self.handle_set(&args).await,
             Command::DELETE => self.handle_delete(&args).await,
@@ -84,7 +86,8 @@ impl Handler {
             {
                 let e = ExpiryFormat::from(expiry_format.as_str());
                 if e != ExpiryFormat::Uninitialized {
-                    self.handle_set_with_expiry(key, value, amount, Some(expiry_format)).await
+                    self.handle_set_with_expiry(key, value, amount, Some(expiry_format))
+                        .await
                 } else {
                     self.handle_set_with_expiry(key, value, amount, None).await
                 }
@@ -97,23 +100,24 @@ impl Handler {
         }
     }
 
-    async fn handle_set_with_expiry(&self, key: &String, value: &String, amount: &String, expiry_format: Option<&String>) -> Value {
+    async fn handle_set_with_expiry(
+        &self,
+        key: &String,
+        value: &String,
+        amount: &String,
+        expiry_format: Option<&String>,
+    ) -> Value {
         if let Ok(amount) = amount.parse::<u64>() {
-
             match expiry_format {
                 Some(e) => {
-                    self.client_store.set_with_expiry(
-                    key.clone(),
-                    value.clone(),
-                    (amount, e),
-                ).await;
+                    self.client_store
+                        .set_with_expiry(key.clone(), value.clone(), (amount, e))
+                        .await;
                 }
                 _ => {
-                    self.client_store.set_with_expiry(
-                        key.clone(),
-                        value.clone(),
-                        amount,
-                    ).await;
+                    self.client_store
+                        .set_with_expiry(key.clone(), value.clone(), amount)
+                        .await;
                 }
             }
             Value::SimpleString("OK".to_string())
@@ -126,7 +130,7 @@ impl Handler {
         if let Some(Value::BulkString(key)) = args.get(0) {
             match self.client_store.remove(key.clone()).await {
                 Ok(_) => Value::SimpleString("OK".to_string()),
-                Err(e) => Value::Error(format!("Error while deleting: {:?}", e))
+                Err(e) => Value::Error(format!("Error while deleting: {:?}", e)),
             }
         } else {
             Value::Error("DEL requires one argument".to_string())
@@ -143,7 +147,6 @@ impl Handler {
             Value::Error("EXISTS requires one argument".to_string())
         }
     }
-
 }
 
 #[derive(Debug, PartialEq)]
@@ -191,7 +194,7 @@ mod tests {
     async fn test_echo_command() -> Result<()> {
         let value = Value::Array(vec![
             Value::BulkString("ECHO".to_string()),
-            Value::BulkString("hello".to_string())
+            Value::BulkString("hello".to_string()),
         ]);
         let cache = Arc::new(Cache::default());
         let mut handler = Handler::new(cache, None);
@@ -205,7 +208,7 @@ mod tests {
         let cache = Arc::new(Cache::default());
         let value = Value::Array(vec![
             Value::BulkString("GET".to_string()),
-            Value::BulkString("key".to_string())
+            Value::BulkString("key".to_string()),
         ]);
         let mut handler = Handler::new(cache.clone(), None);
         let response = handler.handle_request(value.clone()).await?;
@@ -223,7 +226,7 @@ mod tests {
         let value = Value::Array(vec![
             Value::BulkString("SET".to_string()),
             Value::BulkString("key".to_string()),
-            Value::BulkString("value".to_string())
+            Value::BulkString("value".to_string()),
         ]);
 
         let cache = Arc::new(Cache::default());
@@ -231,7 +234,10 @@ mod tests {
 
         let response = handler.handle_request(value.clone()).await?;
         assert_eq!(response, Value::SimpleString("OK".to_string()));
-        assert_eq!(cache.get("key".to_string()).await, Some("value".to_string()));
+        assert_eq!(
+            cache.get("key".to_string()).await,
+            Some("value".to_string())
+        );
         Ok(())
     }
 
@@ -242,13 +248,16 @@ mod tests {
             Value::BulkString("key".to_string()),
             Value::BulkString("value".to_string()),
             Value::BulkString("EX".to_string()),
-            Value::BulkString("100".to_string())
+            Value::BulkString("100".to_string()),
         ]);
         let cache = Arc::new(Cache::default());
         let mut handler = Handler::new(cache.clone(), None);
         let response = handler.handle_request(value.clone()).await?;
         assert_eq!(response, Value::SimpleString("OK".to_string()));
-        assert_eq!(cache.get("key".to_string()).await, Some("value".to_string()));
+        assert_eq!(
+            cache.get("key".to_string()).await,
+            Some("value".to_string())
+        );
 
         Ok(())
     }
@@ -260,7 +269,7 @@ mod tests {
             Value::BulkString("key".to_string()),
             Value::BulkString("value".to_string()),
             Value::BulkString("EX".to_string()),
-            Value::BulkString("0".to_string())
+            Value::BulkString("0".to_string()),
         ]);
         let cache = Arc::new(Cache::default());
         let mut handler = Handler::new(cache.clone(), None);
@@ -277,7 +286,7 @@ mod tests {
         cache.set("key".to_string(), "value".to_string()).await;
         let value = Value::Array(vec![
             Value::BulkString("get".to_string()),
-            Value::BulkString("key".to_string())
+            Value::BulkString("key".to_string()),
         ]);
         let mut handler = Handler::new(cache, None);
 
@@ -286,16 +295,15 @@ mod tests {
 
         let value = Value::Array(vec![
             Value::BulkString("del".to_string()),
-            Value::BulkString("key".to_string())
+            Value::BulkString("key".to_string()),
         ]);
-
 
         let response = handler.handle_request(value.clone()).await?;
         assert_eq!(response, Value::SimpleString("OK".to_string()));
 
         let value = Value::Array(vec![
             Value::BulkString("get".to_string()),
-            Value::BulkString("key".to_string())
+            Value::BulkString("key".to_string()),
         ]);
 
         let response = handler.handle_request(value.clone()).await?;
@@ -311,7 +319,7 @@ mod tests {
 
         let value = Value::Array(vec![
             Value::BulkString("exists".to_string()),
-            Value::BulkString("key".to_string())
+            Value::BulkString("key".to_string()),
         ]);
 
         let mut handler = Handler::new(cache, None);
@@ -321,7 +329,7 @@ mod tests {
 
         let value = Value::Array(vec![
             Value::BulkString("exists".to_string()),
-            Value::BulkString("key1".to_string())
+            Value::BulkString("key1".to_string()),
         ]);
 
         let response = handler.handle_request(value.clone()).await?;
