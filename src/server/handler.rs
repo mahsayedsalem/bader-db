@@ -64,7 +64,7 @@ impl Handler {
         Ok(response)
     }
 
-    async fn handle_get(&mut self, args: &Vec<Value>) -> Value {
+    async fn handle_get(&mut self, args: &[Value]) -> Value {
         if let Some(Value::BulkString(key)) = args.get(0) {
             if let Some(value) = self.client_store.get(key.clone()).await {
                 Value::SimpleString(value)
@@ -76,7 +76,7 @@ impl Handler {
         }
     }
 
-    async fn handle_set(&mut self, args: &Vec<Value>) -> Value {
+    async fn handle_set(&mut self, args: &[Value]) -> Value {
         if let (Some(Value::BulkString(key)), Some(Value::BulkString(value))) =
             (args.get(0), args.get(1))
         {
@@ -125,7 +125,7 @@ impl Handler {
         }
     }
 
-    async fn handle_delete(&self, args: &Vec<Value>) -> Value {
+    async fn handle_delete(&self, args: &[Value]) -> Value {
         if let Some(Value::BulkString(key)) = args.get(0) {
             match self.client_store.remove(key.clone()).await {
                 Ok(_) => Value::SimpleString("OK".to_string()),
@@ -136,7 +136,7 @@ impl Handler {
         }
     }
 
-    async fn handle_exists(&self, args: &Vec<Value>) -> Value {
+    async fn handle_exists(&self, args: &[Value]) -> Value {
         if let Some(Value::BulkString(key)) = args.get(0) {
             match self.client_store.exists(key.clone()).await {
                 true => Value::SimpleString("true".to_string()),
