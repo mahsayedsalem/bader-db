@@ -101,21 +101,21 @@ impl Handler {
 
     async fn handle_set_with_expiry(
         &self,
-        key: &String,
-        value: &String,
-        amount: &String,
+        key: &str,
+        value: &str,
+        amount: &str,
         expiry_format: Option<&String>,
     ) -> Value {
         if let Ok(amount) = amount.parse::<u64>() {
             match expiry_format {
                 Some(e) => {
                     self.client_store
-                        .set_with_expiry(key.clone(), value.clone(), (amount, e))
+                        .set_with_expiry(key.to_owned(), value.to_owned(), (amount, e))
                         .await;
                 }
                 _ => {
                     self.client_store
-                        .set_with_expiry(key.clone(), value.clone(), amount)
+                        .set_with_expiry(key.to_owned(), value.to_owned(), amount)
                         .await;
                 }
             }
