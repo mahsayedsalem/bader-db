@@ -33,11 +33,11 @@ impl Value {
     }
 
     pub fn encode(self) -> String {
-        match &self {
+        match self {
             Value::Null => "$-1\r\n".to_string(),
-            Value::SimpleString(s) => format!("+{}\r\n", s.as_str()),
-            Value::Integer(s) => format!(":{}\r\n", s.as_str()),
-            Value::Error(msg) => format!("-{}\r\n", msg.as_str()),
+            Value::SimpleString(s) => format!("+{}\r\n", s),
+            Value::Integer(s) => format!(":{}\r\n", s),
+            Value::Error(msg) => format!("-{}\r\n", msg),
             Value::BulkString(s) => format!("${}\r\n{}\r\n", s.chars().count(), s),
             _ => panic!("value encode not implemented for: {:?}", self),
         }
