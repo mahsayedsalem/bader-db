@@ -24,11 +24,11 @@ impl Connection {
 
         // Connection closed
         if bytes_read == 0 {
-            return Ok(None);
+            Ok(None)
+        } else {
+            let value = Value::from(&mut self.buffer);
+            Ok(Some(value))
         }
-
-        let value = Value::from(&mut self.buffer.clone());
-        return Ok(Some(value));
     }
 
     pub async fn write_value(&mut self, value: Value) {
