@@ -7,8 +7,8 @@ pub struct Expiry {
 
 impl Expiry {
     pub fn new<I>(instant: I) -> Self
-        where
-            I: Into<Instant>,
+    where
+        I: Into<Instant>,
     {
         Self {
             instant: Some(instant.into()),
@@ -60,13 +60,9 @@ impl From<(u64, &String)> for Expiry {
         let format = expiry.1;
         let expiry_type = format.to_ascii_lowercase().as_str().into();
         match expiry_type {
-            ExpiryFormat::PX => {
-                Duration::from_millis(amount).into()
-            } ,
-            ExpiryFormat::EX => {
-                Duration::from_secs(amount).into()
-            },
-            _ => Self{ instant: None},
+            ExpiryFormat::PX => Duration::from_millis(amount).into(),
+            ExpiryFormat::EX => Duration::from_secs(amount).into(),
+            _ => Self { instant: None },
         }
     }
 }
@@ -94,7 +90,6 @@ impl From<&str> for ExpiryFormat {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

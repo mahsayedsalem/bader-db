@@ -1,15 +1,15 @@
-pub mod expiry;
 mod entry;
+pub mod expiry;
 
+use crate::cache::entry::Entry;
+use crate::cache::expiry::Expiry;
+use anyhow::{Error, Result};
+use async_timer::Interval;
+use rand::prelude::*;
+use std::cmp;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
-use anyhow::{Error, Result};
-use std::cmp;
-use rand::prelude::*;
-use async_timer::Interval;
-use crate::cache::entry::Entry;
-use crate::cache::expiry::Expiry;
 
 #[derive(Debug)]
 pub struct Cache {
@@ -17,7 +17,7 @@ pub struct Cache {
     sample: usize,
     threshold: f64,
     frequency: Duration,
-    is_leader: bool
+    is_leader: bool,
 }
 
 impl Cache {
@@ -46,8 +46,8 @@ impl Cache {
     }
 
     pub async fn set_with_expiry<E>(&self, key: String, value: String, e: E)
-        where
-            E: Into<Expiry>,
+    where
+        E: Into<Expiry>,
     {
         let entry = Entry::new(value, e.into());
 
@@ -65,7 +65,6 @@ impl Cache {
         let store = self.store.read().unwrap();
         match store.get(key.as_str()) {
             Some(entry) => {
-
                 log::debug!("getting key {} and value {:?}", key.clone(), entry);
 
                 if !entry.expiration().is_expired() {
@@ -85,7 +84,6 @@ impl Cache {
         let mut store = self.store.write().unwrap();
         match store.get(key.as_str()) {
             Some(entry) => {
-
                 if self.is_leader {
                     todo!()
                 }
@@ -94,9 +92,7 @@ impl Cache {
                 store.remove(key.as_str());
                 Ok(())
             }
-            _ => {
-                Err(Error::msg(format!("key {:?} doesn't exist", key)))
-            },
+            _ => Err(Error::msg(format!("key {:?} doesn't exist", key))),
         }
     }
 
@@ -106,7 +102,6 @@ impl Cache {
     }
 
     pub async fn monitor_for_expiry(&self) {
-
         log::debug!("removing garbage in the background");
 
         let frequency = self.frequency;
@@ -128,7 +123,6 @@ impl Cache {
         let mut removed = 0;
 
         loop {
-
             let store = self.store.read().unwrap();
 
             if store.is_empty() {
@@ -156,8 +150,7 @@ impl Cache {
                 let mut prev = 0;
 
                 // boxed iterator to allow us to iterate a single time for all indices
-                let mut iter: Box<dyn Iterator<Item = (&String, &Entry)>> =
-                    Box::new(store.iter());
+                let mut iter: Box<dyn Iterator<Item = (&String, &Entry)>> = Box::new(store.iter());
 
                 // walk our index list
                 for idx in indices {
@@ -205,7 +198,12 @@ impl Cache {
                 locked = locked.checked_add(acquired.elapsed()).unwrap();
             }
 
-            log::debug!("Removed {} / {} ({:.2}%) of the sampled keys", gone, sample, (gone as f64 / sample as f64) * 100f64);
+            log::debug!(
+                "Removed {} / {} ({:.2}%) of the sampled keys",
+                gone,
+                sample,
+                (gone as f64 / sample as f64) * 100f64
+            );
 
             removed += gone;
 
@@ -213,7 +211,13 @@ impl Cache {
                 break;
             }
         }
-        log::debug!("Purge loop removed {} entries out of {} in {:.0?} ({:.0?} locked)", removed, total, start.elapsed(), locked);
+        log::debug!(
+            "Purge loop removed {} entries out of {} in {:.0?} ({:.0?} locked)",
+            removed,
+            total,
+            start.elapsed(),
+            locked
+        );
     }
 
     pub async fn len(&self) -> usize {
@@ -223,24 +227,29 @@ impl Cache {
 
     pub async fn is_empty(&self) -> bool {
         let store = self.store.read().unwrap();
-        return store.is_empty()
+        return store.is_empty();
     }
 
     pub async fn existing(&self) -> usize {
         let store = self.store.read().unwrap();
-        store.iter().filter(|(_, entry)| !entry.expiration().is_expired()).count()
+        store
+            .iter()
+            .filter(|(_, entry)| !entry.expiration().is_expired())
+            .count()
     }
 
     pub async fn expired(&self) -> usize {
         let store = self.store.read().unwrap();
-        store.iter().filter(|(_, entry)| entry.expiration().is_expired()).count()
+        store
+            .iter()
+            .filter(|(_, entry)| entry.expiration().is_expired())
+            .count()
     }
 
     pub async fn clear(&self) {
         let mut store = self.store.write().unwrap();
         store.clear();
     }
-
 }
 
 impl Default for Cache {
@@ -249,13 +258,12 @@ impl Default for Cache {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::thread::sleep;
-    use std::sync::Arc;
     use async_std::task;
+    use std::sync::Arc;
+    use std::thread::sleep;
 
     #[tokio::test]
     async fn test_set_get() {
@@ -271,8 +279,10 @@ mod tests {
     #[tokio::test]
     async fn test_expired_is_zero() {
         let cache = Cache::default();
-        let expiry = Expiry::new(Instant::now()  + Duration::from_secs(2));
-        cache.set_with_expiry("key".to_string(), "value".to_string(), expiry.clone()).await;
+        let expiry = Expiry::new(Instant::now() + Duration::from_secs(2));
+        cache
+            .set_with_expiry("key".to_string(), "value".to_string(), expiry.clone())
+            .await;
         let count = cache.expired().await;
         assert_eq!(count, 0);
     }
@@ -281,7 +291,9 @@ mod tests {
     async fn test_expired_is_one() {
         let cache = Cache::default();
         let expiry = Expiry::new(Instant::now());
-        cache.set_with_expiry("key".to_string(), "value".to_string(), expiry.clone()).await;
+        cache
+            .set_with_expiry("key".to_string(), "value".to_string(), expiry.clone())
+            .await;
         let count = cache.expired().await;
         assert_eq!(count, 1);
     }
@@ -290,7 +302,9 @@ mod tests {
     async fn test_len() {
         let cache = Cache::default();
         let expiry = Expiry::new(Instant::now());
-        cache.set_with_expiry("key".to_string(), "value".to_string(), expiry.clone()).await;
+        cache
+            .set_with_expiry("key".to_string(), "value".to_string(), expiry.clone())
+            .await;
         assert_eq!(cache.len().await, 1);
     }
 
@@ -298,7 +312,9 @@ mod tests {
     async fn test_clear() {
         let cache = Cache::default();
         let expiry = Expiry::new(Instant::now());
-        cache.set_with_expiry("key".to_string(), "value".to_string(), expiry.clone()).await;
+        cache
+            .set_with_expiry("key".to_string(), "value".to_string(), expiry.clone())
+            .await;
         cache.clear().await;
         assert_eq!(cache.len().await, 0);
     }
@@ -307,7 +323,9 @@ mod tests {
     async fn test_is_empty() {
         let cache = Cache::default();
         let expiry = Expiry::new(Instant::now());
-        cache.set_with_expiry("key".to_string(), "value".to_string(), expiry.clone()).await;
+        cache
+            .set_with_expiry("key".to_string(), "value".to_string(), expiry.clone())
+            .await;
         cache.clear().await;
         assert!(cache.is_empty().await);
     }
@@ -319,7 +337,9 @@ mod tests {
         let value = "value".to_string();
 
         let expiry = Expiry::new(Instant::now() + Duration::from_secs(2));
-        cache.set_with_expiry(key.clone(), value.clone(), expiry.clone()).await;
+        cache
+            .set_with_expiry(key.clone(), value.clone(), expiry.clone())
+            .await;
         let result = cache.get(key.clone()).await;
         assert_eq!(result, Some(value.clone()));
 
@@ -337,7 +357,9 @@ mod tests {
         let value = "value".to_string();
 
         let expiry = Expiry::new(Instant::now() + Duration::from_secs(5));
-        cache.set_with_expiry(key.clone(), value.clone(), expiry.clone()).await;
+        cache
+            .set_with_expiry(key.clone(), value.clone(), expiry.clone())
+            .await;
         let result = cache.get(key.clone()).await;
         assert_eq!(result, Some(value.clone()));
     }
@@ -349,13 +371,17 @@ mod tests {
         let value = "value".to_string();
 
         let expiry1 = Expiry::new(Instant::now() + Duration::from_secs(2));
-        cache.set_with_expiry(key.clone(), value.clone(), expiry1.clone()).await;
+        cache
+            .set_with_expiry(key.clone(), value.clone(), expiry1.clone())
+            .await;
         let result1 = cache.get(key.clone()).await;
         assert_eq!(result1, Some(value.clone()));
 
         // Update the expiry
         let expiry2 = Expiry::new(Instant::now() + Duration::from_secs(5));
-        cache.set_with_expiry(key.clone(), value.clone(), expiry2.clone()).await;
+        cache
+            .set_with_expiry(key.clone(), value.clone(), expiry2.clone())
+            .await;
         let result2 = cache.get(key.clone()).await;
         assert_eq!(result2, Some(value.clone()));
 
@@ -398,8 +424,10 @@ mod tests {
     #[tokio::test]
     async fn test_existing_is_one() {
         let cache = Cache::default();
-        let expiry = Expiry::new(Instant::now()  + Duration::from_secs(2));
-        cache.set_with_expiry("key".to_string(), "value".to_string(), expiry.clone()).await;
+        let expiry = Expiry::new(Instant::now() + Duration::from_secs(2));
+        cache
+            .set_with_expiry("key".to_string(), "value".to_string(), expiry.clone())
+            .await;
         let count = cache.existing().await;
         assert_eq!(count, 1);
     }
@@ -414,29 +442,71 @@ mod tests {
     #[tokio::test]
     async fn test_purge_expired_keys() {
         let cache = Cache::new(10, 0.5, Duration::from_millis(1));
-        cache.set_with_expiry("key1".to_string(), "value1".to_string(), Duration::from_secs(1)).await;
-        cache.set_with_expiry("key2".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
-        cache.set_with_expiry("key3".to_string(), "value3".to_string(), Duration::from_secs(3)).await;
+        cache
+            .set_with_expiry(
+                "key1".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(1),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key2".to_string(),
+                "value2".to_string(),
+                Duration::from_secs(2),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key3".to_string(),
+                "value3".to_string(),
+                Duration::from_secs(3),
+            )
+            .await;
         sleep(Duration::from_secs(2));
         cache.purge().await;
         assert_eq!(cache.len().await, 1);
         assert_eq!(cache.get("key1".to_string()).await, None);
         assert_eq!(cache.get("key2".to_string()).await, None);
-        assert_eq!(cache.get("key3".to_string()).await, Some("value3".to_string()));
+        assert_eq!(
+            cache.get("key3".to_string()).await,
+            Some("value3".to_string())
+        );
     }
 
     #[tokio::test]
     async fn test_expiry_formats() {
         let cache = Cache::new(10, 0.5, Duration::from_millis(1));
-        cache.set_with_expiry("key1".to_string(), "value1".to_string(), (10u64, &"PX".to_string())).await;
-        cache.set_with_expiry("key2".to_string(), "value2".to_string(), (1u64, &"EX".to_string())).await;
-        cache.set_with_expiry("key3".to_string(), "value3".to_string(), (3u64, &"EX".to_string())).await;
+        cache
+            .set_with_expiry(
+                "key1".to_string(),
+                "value1".to_string(),
+                (10u64, &"PX".to_string()),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key2".to_string(),
+                "value2".to_string(),
+                (1u64, &"EX".to_string()),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key3".to_string(),
+                "value3".to_string(),
+                (3u64, &"EX".to_string()),
+            )
+            .await;
         sleep(Duration::from_secs(2));
         cache.purge().await;
         assert_eq!(cache.len().await, 1);
         assert_eq!(cache.get("key1".to_string()).await, None);
         assert_eq!(cache.get("key2".to_string()).await, None);
-        assert_eq!(cache.get("key3".to_string()).await, Some("value3".to_string()));
+        assert_eq!(
+            cache.get("key3".to_string()).await,
+            Some("value3".to_string())
+        );
     }
 
     #[tokio::test]
@@ -445,8 +515,12 @@ mod tests {
         let key1 = "key1".to_string();
         let key2 = "key2".to_string();
 
-        cache.set_with_expiry(key1.clone(), "value1".to_string(), Duration::from_secs(0)).await;
-        cache.set_with_expiry(key2.clone(), "value2".to_string(), Duration::from_secs(0)).await;
+        cache
+            .set_with_expiry(key1.clone(), "value1".to_string(), Duration::from_secs(0))
+            .await;
+        cache
+            .set_with_expiry(key2.clone(), "value2".to_string(), Duration::from_secs(0))
+            .await;
 
         // wait for the entries to expire
         sleep(Duration::from_millis(100));
@@ -464,9 +538,15 @@ mod tests {
         let key2 = "key2".to_string();
         let key3 = "key3".to_string();
 
-        cache.set_with_expiry(key1.clone(), "value1".to_string(), Duration::from_secs(0)).await;
-        cache.set_with_expiry(key2.clone(), "value2".to_string(), Duration::from_secs(0)).await;
-        cache.set_with_expiry(key3.clone(), "value3".to_string(), Duration::from_secs(60)).await;
+        cache
+            .set_with_expiry(key1.clone(), "value1".to_string(), Duration::from_secs(0))
+            .await;
+        cache
+            .set_with_expiry(key2.clone(), "value2".to_string(), Duration::from_secs(0))
+            .await;
+        cache
+            .set_with_expiry(key3.clone(), "value3".to_string(), Duration::from_secs(60))
+            .await;
 
         // wait for the entries to expire
         sleep(Duration::from_millis(100));
@@ -486,36 +566,216 @@ mod tests {
         let cache = Arc::new(Cache::new(10, 0.5, Duration::from_millis(100)));
         let clone = cache.clone();
         // Insert some values with an expiry time of 3 seconds
-        cache.set_with_expiry("key1".to_string(), "value1".to_string(), Duration::from_secs(3)).await;
-        cache.set_with_expiry("key2".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
-        cache.set_with_expiry("key3".to_string(), "value1".to_string(), Duration::from_secs(1)).await;
-        cache.set_with_expiry("key4".to_string(), "value2".to_string(), Duration::from_secs(1)).await;
-        cache.set_with_expiry("key5".to_string(), "value1".to_string(), Duration::from_secs(2)).await;
-        cache.set_with_expiry("key6".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
-        cache.set_with_expiry("key7".to_string(), "value1".to_string(), Duration::from_secs(3)).await;
-        cache.set_with_expiry("key8".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
-        cache.set_with_expiry("key9".to_string(), "value1".to_string(), Duration::from_secs(3)).await;
-        cache.set_with_expiry("key11".to_string(), "value1".to_string(), Duration::from_secs(3)).await;
-        cache.set_with_expiry("key12".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
-        cache.set_with_expiry("key13".to_string(), "value1".to_string(), Duration::from_secs(1)).await;
-        cache.set_with_expiry("key14".to_string(), "value2".to_string(), Duration::from_secs(1)).await;
-        cache.set_with_expiry("key15".to_string(), "value1".to_string(), Duration::from_secs(2)).await;
-        cache.set_with_expiry("key16".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
-        cache.set_with_expiry("key17".to_string(), "value1".to_string(), Duration::from_secs(3)).await;
-        cache.set_with_expiry("key18".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
-        cache.set_with_expiry("key19".to_string(), "value1".to_string(), Duration::from_secs(4)).await;
-        cache.set_with_expiry("key21".to_string(), "value1".to_string(), Duration::from_secs(3)).await;
-        cache.set_with_expiry("key22".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
-        cache.set_with_expiry("key23".to_string(), "value1".to_string(), Duration::from_secs(1)).await;
-        cache.set_with_expiry("key24".to_string(), "value2".to_string(), Duration::from_secs(1)).await;
-        cache.set_with_expiry("key25".to_string(), "value1".to_string(), Duration::from_secs(2)).await;
-        cache.set_with_expiry("key26".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
-        cache.set_with_expiry("key27".to_string(), "value1".to_string(), Duration::from_secs(4)).await;
-        cache.set_with_expiry("key28".to_string(), "value2".to_string(), Duration::from_secs(2)).await;
-        cache.set_with_expiry("key29".to_string(), "value1".to_string(), Duration::from_secs(3)).await;
-        cache.set_with_expiry("key31".to_string(), "value1".to_string(), Duration::from_secs(3)).await;
-        cache.set_with_expiry("key39".to_string(), "value1".to_string(), Duration::from_secs(6)).await;
-        cache.set_with_expiry("key10".to_string(), "value2".to_string(), Duration::from_secs(7)).await;
+        cache
+            .set_with_expiry(
+                "key1".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(3),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key2".to_string(),
+                "value2".to_string(),
+                Duration::from_secs(2),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key3".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(1),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key4".to_string(),
+                "value2".to_string(),
+                Duration::from_secs(1),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key5".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(2),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key6".to_string(),
+                "value2".to_string(),
+                Duration::from_secs(2),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key7".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(3),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key8".to_string(),
+                "value2".to_string(),
+                Duration::from_secs(2),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key9".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(3),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key11".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(3),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key12".to_string(),
+                "value2".to_string(),
+                Duration::from_secs(2),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key13".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(1),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key14".to_string(),
+                "value2".to_string(),
+                Duration::from_secs(1),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key15".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(2),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key16".to_string(),
+                "value2".to_string(),
+                Duration::from_secs(2),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key17".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(3),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key18".to_string(),
+                "value2".to_string(),
+                Duration::from_secs(2),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key19".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(4),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key21".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(3),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key22".to_string(),
+                "value2".to_string(),
+                Duration::from_secs(2),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key23".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(1),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key24".to_string(),
+                "value2".to_string(),
+                Duration::from_secs(1),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key25".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(2),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key26".to_string(),
+                "value2".to_string(),
+                Duration::from_secs(2),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key27".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(4),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key28".to_string(),
+                "value2".to_string(),
+                Duration::from_secs(2),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key29".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(3),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key31".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(3),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key39".to_string(),
+                "value1".to_string(),
+                Duration::from_secs(6),
+            )
+            .await;
+        cache
+            .set_with_expiry(
+                "key10".to_string(),
+                "value2".to_string(),
+                Duration::from_secs(7),
+            )
+            .await;
 
         task::spawn(async move {
             clone.monitor_for_expiry().await;
@@ -527,5 +787,4 @@ mod tests {
         // Check that the expired keys were removed
         assert_eq!(2, cache.len().await);
     }
-
 }

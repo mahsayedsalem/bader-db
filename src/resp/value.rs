@@ -2,7 +2,6 @@ use crate::resp::parser::Parser;
 use anyhow::{Error, Result};
 use bytes::BytesMut;
 
-
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum Value {
     Null,
@@ -34,11 +33,11 @@ impl Value {
     }
 
     pub fn encode(self) -> String {
-        match &self {
+        match self {
             Value::Null => "$-1\r\n".to_string(),
-            Value::SimpleString(s) => format!("+{}\r\n", s.as_str()),
-            Value::Integer(s) => format!(":{}\r\n", s.as_str()),
-            Value::Error(msg) => format!("-{}\r\n", msg.as_str()),
+            Value::SimpleString(s) => format!("+{}\r\n", s),
+            Value::Integer(s) => format!(":{}\r\n", s),
+            Value::Error(msg) => format!("-{}\r\n", msg),
             Value::BulkString(s) => format!("${}\r\n{}\r\n", s.chars().count(), s),
             _ => panic!("value encode not implemented for: {:?}", self),
         }
@@ -47,9 +46,9 @@ impl Value {
 
 impl From<&mut BytesMut> for Value {
     fn from(buffer: &mut BytesMut) -> Self {
-        match  Parser::parse_message(buffer){
+        match Parser::parse_message(buffer) {
             Ok((v, _)) => v,
-            _ => Self::Error("error in parsing".to_string())
+            _ => Self::Error("error in parsing".to_string()),
         }
     }
 }
@@ -57,7 +56,7 @@ impl From<&mut BytesMut> for Value {
 #[cfg(test)]
 mod tests {
     use crate::resp::value::Value;
-    use bytes::{BytesMut, BufMut};
+    use bytes::{BufMut, BytesMut};
 
     #[test]
     fn test_unwrap_bulk_string() {
@@ -141,7 +140,12 @@ mod tests {
         let mut bytes = BytesMut::new();
         bytes.put_slice(b"*2\r\n$5\r\nhello\r\n$5\r\nworld\r\n");
         let v = Value::from(&mut bytes);
-        assert_eq!(v, Value::Array(vec![Value::BulkString("hello".to_string()),
-                                        Value::BulkString("world".to_string())]))
+        assert_eq!(
+            v,
+            Value::Array(vec![
+                Value::BulkString("hello".to_string()),
+                Value::BulkString("world".to_string())
+            ])
+        )
     }
 }

@@ -101,6 +101,9 @@ mod tests {
         let expired_instant = Instant::now() - Duration::from_secs(5);
         let expired_expiry = Expiry::new(expired_instant);
         let expired_entry = Entry::new(value.clone(), expired_expiry);
-        assert_eq!(expired_entry.expiration().remaining(), Some(Duration::from_nanos(0)));
+        assert_eq!(
+            expired_entry.expiration().remaining(),
+            Some(Duration::from_nanos(0))
+        );
     }
 }
